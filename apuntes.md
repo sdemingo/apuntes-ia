@@ -4,14 +4,22 @@ numbersections: true
 title: "Apuntes sobre la IA"
 author: "Sergio de Mingo"
 date: "2 de febrero de 2026"
+header-includes: |
+  \lstset{
+    frame=single,
+    framesep=5pt,
+    rulecolor=\color{black},
+    basicstyle=\small\ttfamily,
+    aboveskip=2em,   % Espacio antes del bloque
+    belowskip=2em,    % Espacio después del bloque
+    breaklines=true
+  }
+  \setlength{\parskip}{1em}
+  \setlength{\parindent}{0pt}
 ---
 
 
-Estos apuntes son parte de la conclusiones sacadas a partir del estudio con
-Gemini de los conceptos aquí desarrollados.
-
-
-# El perceptron
+# El perceptrón
 
 
 El Perceptrón (propuesto por Rosenblatt en los 50) es la unidad atómica de la
@@ -135,9 +143,9 @@ y_OR = np.array([0, 1, 1, 1])
 p = Perceptron(n_inputs=2)
 p.train(X, y_AND)
 
-print("Probamos que sepa calcular una operación AND u OR:")
+print("Probamos que sepa calcular un AND u OR:")
 for t in X:
-    print(f"Entrada: {t} -> Predicción: {p.predict(t)}")
+    print(f"Entrada: {t} -> Prediccion: {p.predict(t)}")
 ```
 
 La magia se produce cuando tras probar el perceptrón con el vector de
@@ -257,7 +265,7 @@ for epoch in range(epochs):
     error_hidden_layer = d_predicted_output.dot(W2.T)
     d_hidden_layer = error_hidden_layer * sigmoid_derivative(hidden_layer_output)
 
-    # --- ACTUALIZACIÓN DE PESOS (Gradiente Descendente) ---
+    # --- ACTUALIZACION DE PESOS (Gradiente Descendente) ---
     W2 += hidden_layer_output.T.dot(d_predicted_output) * learning_rate
     b2 += np.sum(d_predicted_output, axis=0, keepdims=True) * learning_rate
     W1 += X.T.dot(d_hidden_layer) * learning_rate
