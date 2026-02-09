@@ -1,7 +1,8 @@
 ---
 geometry: margin=2cm
 numbersections: true
-title: "Apuntes sobre la IA"
+toc: true
+title: "Apuntes sobre IA"
 author: "Sergio de Mingo"
 date: "2 de febrero de 2026"
 header-includes: |
@@ -18,6 +19,8 @@ header-includes: |
   \setlength{\parindent}{0pt}
 ---
 
+
+\vspace{1cm}
 
 # El perceptrón
 
@@ -36,7 +39,11 @@ $$
 
 * Pesos (*w*): La "importancia" que la red le da a cada entrada. Aprender en IA es, literalmente, ajustar estos números.
 
-* Bias (*b*): El sesgo, que permite desplazar la función de activación hacia la izquierda o derecha para ajustarse mejor a los datos.
+* Bias (*b*): El sesgo, que permite desplazar la función de activación hacia la
+  izquierda o derecha para ajustarse mejor a los datos. Es como el umbral de un
+  interruptor: Si el bias es muy alto y positivo, la neurona es «entusiasta» y
+  se activa casi siempre. Por contra, si el bias es muy negativo, la neurona es
+  «escéptica» y necesita señales de entrada muy fuertes para activarse.
 
 * Función de activación (*f*): Decide si la neurona "dispara" una señal o no. Antiguamente usábamos la Heaviside (escalón) o la Sigmoide.
 
@@ -273,6 +280,100 @@ for epoch in range(epochs):
 
 ```
 
+En el código, la variable `d_predicted_output` ya representa la derivada del
+error respecto a la salida. Por tanto, para actualizar los pesos de la segunda
+capa ($W_2$), aplicamos la regla de la cadena: la variación del error depende de
+lo que salió de la capa anterior (`hidden_layer_output`) y del error final.
+
+La actualización de pesos en la salida la estamos haciendo en `W2 +=
+hidden_layer_output.T.dot(...) ...`. Aquí estamos calculando el gradiente para
+la matriz de pesos completa. Usamos la transpuesta (`.T`) porque queremos
+relacionar cada neurona oculta con cada error de salida, creando una matriz de
+ajustes que coincida con las dimensiones de $W_2$. La actualización de pesos en
+la entrada sigue la misma lógica pero un paso más atrás. La hacemos en `W1 +=
+X.T.dot(....)`. Aquí, el gradiente depende de la entrada original X y del error
+que hemos "retropropagado" hasta la capa oculta (`d_hidden_layer`).
+
+Con los sesgos no tenemos una propagación. Cada sesgo se actualiza en base a su
+propia neurona ya que el sesgo realmente determina qué tan fácil es que la
+neurona se active, independientemente de la señal de entrada.  Para entender
+bien su actualización pensemos en una ecuación líneal $y = wx +b$. El peso ($w$)
+controla la pendiente (la inclinación de la línea) pero el bias ($b$) controla
+la intersección con el eje Y (desplaza la línea hacia arriba o hacia abajo). Si
+solo ajustáramos los pesos, todas nuestras líneas de decisión tendrían que pasar
+obligatoriamente por el origen (0,0). El bias permite que la línea se mueva
+libremente por el espacio para rodear los datos donde sea que estén. ¿Por qué
+usamos `np.sum()` en el código a la hora de actualizar este bias? Vamos a
+detallar la estructura de la matriz de error llamada `d_predicted_output`. Es
+una matriz 4x1 con un error por cada fila o ejemplo del XOR:
+
+$$\delta = \begin{pmatrix} \text{error ejemplo 1} \\ \text{error ejemplo 2} \\ \text{error ejemplo 3} \\ \text{error ejemplo 4} \end{pmatrix}$$
+
+Sin embargo, solo tenemos un bias para esa neurona. No tenemos un bias por cada
+ejemplo. Por lo tanto, el ajuste del bias debe ser un valor único que resuma
+cómo debe cambiar la neurona para satisfacer (en promedio) a los 4 ejemplos. Por
+eso en Python escribimos `b2 += np.sum(d_predicted_output, axis=0,
+...)`. Estamos acumulando la presión de error de los 4 ejemplos para decidir si,
+en general, esa neurona debería tener un umbral más alto o más bajo.
+
+## Representación matricial
+
+Vamos a representar las diferentes matrices que más juego tienen en el ejemplo
+para visualizar mejor todo esto.  Primeramente tenemos la **matriz de pesos de la
+capa oculta** o $W_1$. Esta matriz conecta las 2 entradas con las 2 neuronas
+ocultas. Es una matriz de $2 \times 2$. Cada columna representa los pesos que
+llegan a una neurona oculta específica.  
+
+$$W_1 = \begin{pmatrix} w_{11} & w_{12}
+\\ w_{21} & w_{22} \end{pmatrix}$$
+
+
+Tras esta también tenemos la **matriz de Salida de la Capa Oculta** o $A_1$ o
+`hidden_layer_output`). Es el resultado de multiplicar la entrada $X$ (de $4
+\times 2$) por $W_1$ y aplicar la sigmoide. El resultado es una matriz de 4
+filas (ejemplos) y 2 columnas (activaciones de las neuronas ocultas). Cada fila
+$i$ representa cómo "ve" la capa oculta el ejemplo $i$ del XOR.
+
+$$A_1 = \begin{pmatrix} a_{1,1} & a_{1,2} \\ a_{2,1} & a_{2,2} \\ a_{3,1} & a_{3,2} \\ a_{4,1} & a_{4,2} \end{pmatrix}$$ 
+
+
+Vemos también la **matriz de Pesos de la Capa de Salida** ($W_2$). Esta matriz
+conecta las 2 neuronas ocultas con la única neurona de salida. Es un vector
+columna de $2 \times 1$.  
+
+$$W_2 = \begin{pmatrix} w'_{1} \\ w'_{2} \end{pmatrix}$$
+
+
+Por último tenemos la **matriz de Predicción Final** o $A_2$
+(`predicted_output`). Es el resultado final tras la última activación. Es una
+matriz de 4 filas (una predicción por cada ejemplo de entrada) y 1 columna.
+
+$$A_2 = \begin{pmatrix} \hat{y}_1 \\ \hat{y}_2 \\ \hat{y}_3 \\ \hat{y}_4 \end{pmatrix}$$ 
+
+Al final del entrenamiento, esta matriz debería aproximarse a los valores del
+XOR: $\begin{pmatrix} 0 \\ 1 \\ 1 \\ 0 \end{pmatrix}$.
+
+
+Si vemos toda la operación del *Forward Pass* como una sola línea de álgebra
+lineal, la estructura que está ejecutando tu código es: 
+
+$$A_2 = \sigma \left( \sigma(X \cdot W_1 + b_1) \cdot W_2 + b_2 \right)$$ 
+
+Análisis de dimensiones:
+    1. $X (4 \times 2) \cdot W_1 (2 \times 2) = (4 \times 2)$
+    2. $(4 \times 2) \cdot W_2 (2 \times 1) = (4 \times 1)$ $\rightarrow$ ¡Coincide con la dimensión de la salida deseada!
+
+¿Ves cómo las dimensiones "encajan" como piezas de un puzle? Si intentaras
+cambiar el número de neuronas ocultas a 3, $W_1$ pasaría a ser $(2 \times 3)$ y
+$W_2$ pasaría a ser $(3 \times 1)$. El resultado final seguiría siendo $(4
+\times 1)$.
+
+
+
+
+
+---
+
 
 Vamos a ver esto de forma algo más formal. La regla general para actualizar
 cualquier peso en la red es:
@@ -282,7 +383,10 @@ $$w_{nuevo} = w_{actual} - \eta \cdot \frac{\partial E}{\partial w}$$
 Donde:
 
 * $\eta$ es el learning rate (la longitud del paso).
-* $\frac{\partial E}{\partial w}$ es el gradiente, que nos indica la dirección de máxima subida del error. Como queremos bajar, restamos este valor (o lo sumamos si el gradiente ya incluye el signo del error, como en nuestro código).
+* $\frac{\partial E}{\partial w}$ es el gradiente, que nos indica la dirección
+  de máxima subida del error. Como queremos bajar, restamos este valor (o lo
+  sumamos si el gradiente ya incluye el signo del error, como en nuestro
+  código).
 
 Para **actualizar los pesos de la salida** $W_2$ debemos calcular el gradiente
 para la matriz de pesos completa: 
@@ -295,6 +399,10 @@ salida. Usamos la transpuesta (T) porque queremos relacionar cada neurona oculta
 con cada error de salida, creando una matriz de ajustes que coincida con las
 dimensiones de $W_2$.
 
+>*Una **matriz traspuesta** es aquella en donde el elemento a j i $a_{ji}$ de la
+>matriz original A $A$ se convertirá en el elemento a i j $a_{ij}$ de la matriz
+>traspuesta A t $A^{t}$. Dicho de otra manera, donde intercambiamos las columnas
+>por filas*.
 
 Para **actualizar los pesos de la entrada** $W_1$ debemos aplicar la misma lógica
 pero un paso más atrás en la red. Aquí, el gradiente depende de la entrada
