@@ -482,10 +482,12 @@ fuente y su simbología matemática utilizada en el desarrollo:
 
 ----
 
->Recordatorio: *Una **matriz traspuesta** es aquella en donde el elemento a j i $a_{ji}$ de la
->matriz original A $A$ se convertirá en el elemento a i j $a_{ij}$ de la matriz
->traspuesta A t $A^{t}$. Dicho de otra manera, donde intercambiamos las columnas
->por filas*.
+# Anotaciones
+
+* Matriz Traspuesta: Una **matriz traspuesta** es aquella en donde el elemento a j i $a_{ji}$ de la
+matriz original A $A$ se convertirá en el elemento a i j $a_{ij}$ de la matriz
+traspuesta A t $A^{t}$. Dicho de otra manera, donde intercambiamos las columnas
+por filas.
 
 
 
