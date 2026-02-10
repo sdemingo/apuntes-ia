@@ -1,2 +1,3 @@
 all:
-	pandoc apuntes.md -o /tmp/prueba.pdf --listings -Vlang=es-ES
+	mkdir -p pdf
+	pandoc apuntes.md -o pdf/prueba.pdf --listings -Vlang=es-ES
