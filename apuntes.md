@@ -319,98 +319,173 @@ en general, esa neurona debería tener un umbral más alto o más bajo.
 ## Representación matricial
 
 Vamos a representar las diferentes matrices que más juego tienen en el ejemplo
-para visualizar mejor todo esto.  Primeramente tenemos la **matriz de pesos de la
-capa oculta** o $W_1$. Esta matriz conecta las 2 entradas con las 2 neuronas
-ocultas. Es una matriz de $2 \times 2$. Cada columna representa los pesos que
+para visualizar mejor todo esto. Partimos de las dos matrices iniciales: la **matriz de datos de entrada** o $X$, donde la primera columna es la entrada $x_1$ y la segunda es $x_2$ y la **matriz de resultados esperados** o $y$:
+
+$$X = \begin{pmatrix} 0 & 0 \\ 0 & 1 \\ 1 & 0 \\ 1 & 1 \end{pmatrix}$$
+
+$$y = \begin{pmatrix} 0 \\ 1 \\ 1 \\ 0 \end{pmatrix}$$
+
+### Forward Pass
+
+Ahora empezamos con las matrices más importantes y relacionadas con el proceso
+de aprendizaje.  Primeramente tenemos la **matriz de pesos de la capa oculta** o
+$W_1$. Esta matriz conecta las 2 entradas con las 2 neuronas ocultas. Es una
+matriz de $2 \times 2$. Cada columna representa los pesos que
 llegan a una neurona oculta específica.  
 
-$$W_1 = \begin{pmatrix} w_{11} & w_{12}
-\\ w_{21} & w_{22} \end{pmatrix}$$
+$$
+W_1 = \begin{pmatrix} w_{11} & w_{12} \\ w_{21} & w_{22} \end{pmatrix}
+$$
 
 
 Tras esta también tenemos la **matriz de Salida de la Capa Oculta** o $A_1$ o
 `hidden_layer_output`). Es el resultado de multiplicar la entrada $X$ (de $4
-\times 2$) por $W_1$ y aplicar la sigmoide. El resultado es una matriz de 4
-filas (ejemplos) y 2 columnas (activaciones de las neuronas ocultas). Cada fila
-$i$ representa cómo "ve" la capa oculta el ejemplo $i$ del XOR.
+\times 2$) por $W_1$. Con esto obtenemos el resultado parcial $Z_1$ y
+finalizamos aplicando la función de activación (sigmoide). El resultado es una
+matriz de 4 filas (ejemplos) y 2 columnas (activaciones de las neuronas
+ocultas). Cada fila $i$ representa cómo "ve" la capa oculta el ejemplo $i$ del
+XOR.
 
-$$A_1 = \begin{pmatrix} a_{1,1} & a_{1,2} \\ a_{2,1} & a_{2,2} \\ a_{3,1} & a_{3,2} \\ a_{4,1} & a_{4,2} \end{pmatrix}$$ 
+$$
+Z_1 = \left( \begin{pmatrix} 0 & 0 \\ 0 & 1 \\ 1 & 0 \\ 1 & 1 \end{pmatrix} \cdot \begin{pmatrix} w_{11} & w_{12} \\ w_{21} & w_{22} \end{pmatrix} \right) + (0,0)
+$$ 
 
-
-Vemos también la **matriz de Pesos de la Capa de Salida** ($W_2$). Esta matriz
-conecta las 2 neuronas ocultas con la única neurona de salida. Es un vector
-columna de $2 \times 1$.  
-
-$$W_2 = \begin{pmatrix} w'_{1} \\ w'_{2} \end{pmatrix}$$
-
-
-Por último tenemos la **matriz de Predicción Final** o $A_2$
-(`predicted_output`). Es el resultado final tras la última activación. Es una
-matriz de 4 filas (una predicción por cada ejemplo de entrada) y 1 columna.
-
-$$A_2 = \begin{pmatrix} \hat{y}_1 \\ \hat{y}_2 \\ \hat{y}_3 \\ \hat{y}_4 \end{pmatrix}$$ 
-
-Al final del entrenamiento, esta matriz debería aproximarse a los valores del
-XOR: $\begin{pmatrix} 0 \\ 1 \\ 1 \\ 0 \end{pmatrix}$.
+$$A_1 = \sigma(Z_1) = \begin{pmatrix} \sigma(z_{11}) & \sigma(z_{12}) \\ \sigma(z_{21}) & \sigma(z_{22}) \\ \sigma(z_{31}) & \sigma(z_{32}) \\ \sigma(z_{41}) & \sigma(z_{42}) \end{pmatrix} = \begin{pmatrix} a_{1,1} & a_{1,2} \\ a_{2,1} & a_{2,2} \\ a_{3,1} & a_{3,2} \\ a_{4,1} & a_{4,2} \end{pmatrix}
+$$ 
 
 
-Si vemos toda la operación del *Forward Pass* como una sola línea de álgebra
-lineal, la estructura que está ejecutando tu código es: 
-
-$$A_2 = \sigma \left( \sigma(X \cdot W_1 + b_1) \cdot W_2 + b_2 \right)$$ 
-
-Análisis de dimensiones:
-    1. $X (4 \times 2) \cdot W_1 (2 \times 2) = (4 \times 2)$
-    2. $(4 \times 2) \cdot W_2 (2 \times 1) = (4 \times 1)$ $\rightarrow$ ¡Coincide con la dimensión de la salida deseada!
-
-¿Ves cómo las dimensiones "encajan" como piezas de un puzle? Si intentaras
-cambiar el número de neuronas ocultas a 3, $W_1$ pasaría a ser $(2 \times 3)$ y
-$W_2$ pasaría a ser $(3 \times 1)$. El resultado final seguiría siendo $(4
-\times 1)$.
+Vamos ahora con el siguiente paso del aprendizaje. Ahora igual que antes obtenemos la salida de esta capa aplicando como entrada $A$ (calculada anteriormente) con los pesos $W_2$ y el sesgo apropiado. A esto lo llamamos $Z_2$ y a esto le aplicaremos la función de activación para obtener $A_2$ o lo que es lo mismo, la **matriz de predicción final**:
 
 
+$$
+Z_2 = \begin{pmatrix} a_{11} & a_{12} \\ a_{21} & a_{22} \\ a_{31} & a_{32} \\ a_{41} & a_{42} \end{pmatrix} \times \begin{pmatrix} w'_{1} \\ w'_{2} \end{pmatrix} + \begin{pmatrix} b_{2} \\ b_{2} \\ b_{2} \\ b_{2} \end{pmatrix}
+$$
+
+$$
+Z_2 = \begin{pmatrix} (a_{11} \cdot w'_{1} + a_{12} \cdot w'_{2}) + b_{2} \\ (a_{21} \cdot w'_{1} + a_{22} \cdot w'_{2}) + b_{2} \\ (a_{31} \cdot w'_{1} + a_{32} \cdot w'_{2}) + b_{2} \\ (a_{41} \cdot w'_{1} + a_{42} \cdot w'_{2}) + b_{2} \end{pmatrix}
+$$
+
+$$
+A_2 = \sigma(Z_2) = \begin{pmatrix} \hat{y}_1 \\ \hat{y}_2 \\ \hat{y}_3 \\ \hat{y}_4 \end{pmatrix}
+$$
 
 
+Cada $\hat{y}_i$ es ahora una combinación no lineal de las activaciones ocultas. Si la
+capa oculta ha hecho bien su trabajo, habrá separado los puntos de tal manera
+que para el caso (0,1) y (1,0), los valores de $a_{i1}$ y $a_{i2}$ activen con
+fuerza a $W_2$, mientras que para (0,0) y (1,1) la combinación resulte en un
+valor que la sigmoide convierta en casi 0.
 
----
+### Backpropagation o propagación del error
+
+Entramos en la parte más profunda del backpropagation de la IA. Aquí es donde el
+error viaja hacia el pasado. Primeramente calculamos cuánto error hay en la
+salida final. Este valor también lo llamaremos **delta de salida** y se
+representa en código con la variable `d_predict_error`. Es el producto elemento
+a elemento (Hadamard product, representado por $\odot$) entre el error residual
+y la derivada de lo que salió. Esto nos devuelve finalmente una matriz $4 \times
+1$:
+
+$$\delta_{out} = (y - A_2) \odot \sigma'(Z_2)$$
+
+$$\delta_{out} = \begin{pmatrix} (y_1 - \hat{y}_1) \cdot \sigma'(z_{2,1}) \\ (y_2 - \hat{y}_2) \cdot \sigma'(z_{2,2}) \\ (y_3 - \hat{y}_3) \cdot \sigma'(z_{2,3}) \\ (y_4 - \hat{y}_4) \cdot \sigma'(z_{2,4}) \end{pmatrix} = \begin{pmatrix} \delta_{out,1} \\ \delta_{out,2} \\ \delta_{out,3} \\ \delta_{out,4} \end{pmatrix}$$
+
+Aquí es donde aplicamos la línea: `error_hidden_layer = d_predicted_output.dot(W2.T)`.
+Como ingeniero, piensa en esto como una proyección inversa: estamos enviando el error de salida de vuelta a través de los mismos cables ($W_2$) por los que vino.
+
+$$\text{Error}_{hidden} = \delta_{out} \times W_2^T$$
+
+$$\text{Error}_{hidden} = \begin{pmatrix} \delta_{out,1} \\ \delta_{out,2} \\ \delta_{out,3} \\ \delta_{out,4} \end{pmatrix} \times \begin{pmatrix} w'_{1} & w'_{2} \end{pmatrix} = \begin{pmatrix} \delta_{out,1} \cdot w'_{1} & \delta_{out,1} \cdot w'_{2} \\ \delta_{out,2} \cdot w'_{1} & \delta_{out,2} \cdot w'_{2} \\ \delta_{out,3} \cdot w'_{1} & \delta_{out,3} \cdot w'_{2} \\ \delta_{out,4} \cdot w'_{1} & \delta_{out,4} \cdot w'_{2} \end{pmatrix}$$
+
+El resultado es una matriz de $4 \times 2$. Cada columna representa cuánto"ruido
+o error le llegó a cada una de las 2 neuronas ocultas. Finalmente, para saber
+cuánto debemos cambiar los pesos $W_1$, necesitamos filtrar ese error por la
+sensibilidad de la activación de la capa oculta. Es decir, multiplicamos por la
+derivada de la sigmoide de la capa oculta. Esto se representa en el código con
+la variable `d_hidden_layer`:
+
+$$\delta_{hidden} = \text{Error}_{hidden} \odot \sigma'(Z_1)$$
+
+$$\delta_{hidden} = \begin{pmatrix} \text{err}_{1,1} \cdot \sigma'(z_{1,1}) & \text{err}_{1,2} \cdot \sigma'(z_{1,2}) \\ \text{err}_{2,1} \cdot \sigma'(z_{2,1}) & \text{err}_{2,2} \cdot \sigma'(z_{2,2}) \\ \text{err}_{3,1} \cdot \sigma'(z_{3,1}) & \text{err}_{3,2} \cdot \sigma'(z_{3,2}) \\ \text{err}_{4,1} \cdot \sigma'(z_{4,1}) & \text{err}_{4,2} \cdot \sigma'(z_{4,2}) \end{pmatrix} = \begin{pmatrix} \delta_{h1,1} &
+\delta_{h2,1} \\ \delta_{h1,2} & \delta_{h2,2} \\ \delta_{h1,3} & \delta_{h2,3}
+\\ \delta_{h1,4} & \delta_{h2,4} \end{pmatrix}$$
 
 
-Vamos a ver esto de forma algo más formal. La regla general para actualizar
-cualquier peso en la red es:
+Mientras que `error_hidden_layer` es el error en bruto que le llega a la capa
+oculta desde la salida, `d_hidden_layer` es el error ya ponderado por la
+pendiente de la activación. Si una neurona oculta estaba en la zona plana de la
+sigmoide (valor muy alto o muy bajo), su derivada será casi 0, y por tanto, su
+`d_hidden_layer` será casi 0. Dicho de otra manera, si la neurona ya estaba muy
+convencida de su respuesta (activación saturada), no le importa el error que le
+mandes porque no va a cambiar sus pesos.
 
-$$w_{nuevo} = w_{actual} - \eta \cdot \frac{\partial E}{\partial w}$$
 
-Donde:
+### Actualización de pesos
 
-* $\eta$ es el learning rate (la longitud del paso).
-* $\frac{\partial E}{\partial w}$ es el gradiente, que nos indica la dirección
-  de máxima subida del error. Como queremos bajar, restamos este valor (o lo
-  sumamos si el gradiente ya incluye el signo del error, como en nuestro
-  código).
+Para completar el ciclo, vamos a ver cómo ese error que ha viajado hacia atrás
+se convierte finalmente en instrucciones de ajuste para los pesos. En el código,
+estas son las líneas de Gradiente Descendente. La variable en el código que
+vamos a desarrollar ahora sería: `W2 +=
+hidden_layer_output.T.dot(d_predicted_output) * learning_rate.`  En ella se
+actualizan los valores de $W2$. Para ajustar esos pesos (recordamos que són los
+que conectan la capa oculta con la salida), multiplicamos la activación que
+salió de la capa oculta ($A_1^T$) y que calculamos en la fase de *Forward Pass*
+por el delta de salida ($\delta_{out}$) obtenido en la fase de
+*backpropagation*. En la formulación usaremos $\eta$ para referirnos al
+*learning rate*. El resultado es una matriz de $[2 \times 1]$, que encaja
+perfectamente con las dimensiones de $W_2$:
 
-Para **actualizar los pesos de la salida** $W_2$ debemos calcular el gradiente
-para la matriz de pesos completa: 
+$$\Delta W_2 = \eta \cdot \left( \begin{pmatrix} a_{11} & a_{21} & a_{31} & a_{41} \\ a_{12} & a_{22} & a_{32} & a_{42} \end{pmatrix} \times \begin{pmatrix} \delta_{out,1} \\ \delta_{out,2} \\ \delta_{out,3} \\ \delta_{out,4} \end{pmatrix} \right)$$
 
-$$\Delta W_2 = \eta \cdot (A_1^T \cdot
-\delta_2)$$ 
+$$\Delta W_2 = \eta \cdot \begin{pmatrix} \sum (a_{i1} \cdot \delta_{out,i}) \\ \sum (a_{i2} \cdot \delta_{out,i}) \end{pmatrix}$$
 
-Donde $A_1$ es la salida de la capa oculta y $\delta_2$ es el error local de la
-salida. Usamos la transpuesta (T) porque queremos relacionar cada neurona oculta
-con cada error de salida, creando una matriz de ajustes que coincida con las
-dimensiones de $W_2$.
 
->*Una **matriz traspuesta** es aquella en donde el elemento a j i $a_{ji}$ de la
+Ahora hacemos algo similar con los pesos iniciales o $W_1$. La variable en el
+código es: `W1 += X.T.dot(d_hidden_layer) * learning_rate`.  Aquí es donde
+resolvemos el misterio del XOR. Usamos la entrada original ($X^T$) y la
+multiplicamos por el error que hemos calculado para la capa oculta
+($\delta_{hidden}$). El resultado es una matriz de $[2 \times 2]$, lista para sumarse a $W_1$:
+
+$$\Delta W_1 = \eta \cdot \left( \begin{pmatrix} 0 & 0 & 1
+& 1 \\ 0 & 1 & 0 & 1 \end{pmatrix} \times \begin{pmatrix} \delta_{h1,1} &
+\delta_{h2,1} \\ \delta_{h1,2} & \delta_{h2,2} \\ \delta_{h1,3} & \delta_{h2,3}
+\\ \delta_{h1,4} & \delta_{h2,4} \end{pmatrix} \right)$$ 
+
+
+$$\Delta W_1 = \eta \cdot
+\begin{pmatrix} \sum (x_{i1} \cdot \delta_{h1,i}) & \sum (x_{i1} \cdot
+\delta_{h2,i}) \\ \sum (x_{i2} \cdot \delta_{h1,i}) & \sum (x_{i2} \cdot
+\delta_{h2,i}) \end{pmatrix}$$
+
+Es importante fijarse en la belleza de la operación $X^T \cdot
+\delta_{hidden}$. Si la entrada $x_{11}$ fue 0, no importa cuán grande sea el
+error $\delta_{h1,1}$, el producto será 0. Esto tiene todo el sentido lógico: si
+una entrada fue cero, no pudo haber contribuido al error final de esa neurona,
+por lo tanto, no hay razón para cambiar el peso que viene de ella.
+
+Para terminar dejamos aquí una relación entre las variables usadas en el código
+fuente y su simbología matemática utilizada en el desarrollo:
+
+
+* `X` ($X$) Matriz de Entrada: Los 4 casos del XOR ($4 \times 2$).
+* `y` ($y$) Etiquetas Reales: Los resultados deseados ($4 \times 1$).
+* `W1, W2` ($W_1, W_2$) Matrices de Pesos: Las conexiones entre capas.
+* `b1, b2` ($b_1, b_2$) Vectores de Sesgo (Bias): El umbral de activación.
+* `hidden_layer_output` ($A_1$) Activación Oculta: La salida de la capa intermedia.
+* `predicted_output` ($A_2$ o $\hat{y}$) Predicción Final: La salida de la red.
+* `error` ($y - A_2$)  Error Residual: Diferencia bruta entre realidad y predicción.
+* `d_predicted_output` ($\delta_2$ o Delta 2) Gradiente de Salida: Error de salida multiplicado por la derivada.
+* `error_hidden_layer` ($E_{hidden}$) Error Retropropagado: El error que "rebota" hacia la capa oculta.
+* `d_hidden_layer` ($\delta_1$ o Delta 1) Gradiente Oculto: El error en la capa oculta listo para ajustar $W_1$.
+* `learning_rate` ($\eta$) Tasa de Aprendizaje: El factor de escala de los ajustes.
+
+
+----
+
+>Recordatorio: *Una **matriz traspuesta** es aquella en donde el elemento a j i $a_{ji}$ de la
 >matriz original A $A$ se convertirá en el elemento a i j $a_{ij}$ de la matriz
 >traspuesta A t $A^{t}$. Dicho de otra manera, donde intercambiamos las columnas
 >por filas*.
-
-Para **actualizar los pesos de la entrada** $W_1$ debemos aplicar la misma lógica
-pero un paso más atrás en la red. Aquí, el gradiente depende de la entrada
-original $X$ y del error que hemos "retropropagado" hasta la capa oculta desde
-el final.
-
-$$\Delta W_1 = \eta \cdot (X^T \cdot \delta_1)$$
-
 
 
 

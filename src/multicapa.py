@@ -32,9 +32,10 @@ hidden_neurons = 2
 output_neurons = 1
 
 # Pesos (Weights) y Sesgos (Biases)
-# W1 conecta Entrada con Oculta (2x2)
+# W1 conecta Entrada con Oculta (2x2). b1 se inicializa como 
+# un array bidimensinal (porque hidden_neurons=2) todo a 0s
 W1 = np.random.uniform(size=(input_neurons, hidden_neurons))
-b1 = np.zeros((1, hidden_neurons))
+b1 = np.zeros((1, hidden_neurons)) 
 
 # W2 conecta Oculta con Salida (2x1)
 W2 = np.random.uniform(size=(hidden_neurons, output_neurons))
