@@ -1,6 +1,9 @@
 all:
 	mkdir -p pdf
-	pandoc apuntes.md -o pdf/apuntes.pdf --listings -Vlang=es-ES
+	#pandoc draft.md -o pdf/draft.pdf --listings -Vlang=es-ES
+	latexmk -pdf apuntes.tex
+	mv apuntes.pdf pdf/
 
 clean:
-	rm -r pdf
+	latexmk -c
+
