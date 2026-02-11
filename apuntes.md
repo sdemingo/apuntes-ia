@@ -202,6 +202,8 @@ una función lineal, por muchas capas que pongamos, la red seguiría siendo una
 simple combinación lineal (una sola línea recta). La no-linealidad es lo que
 permite "curvar" el espacio necesario para este caso.
 
+![Esquema general de la red multicapa](./img/esquema.png){width=60%}
+
 ## Aprendizaje en varias capas
 
 El concepto que revolucionó la IA en los 80 fue: ¿Cómo el error se calcula al
@@ -216,27 +218,28 @@ capa? El proceso de aprendizaje ahora se basa en estos tres pasos:
 
 
 El **Gradiente** es lo que nos dice en qué dirección y con qué fuerza debemos
-mover el peso para que el error total disminuya lo más rápido posible. 
-En una red neuronal, para saber cómo afecta un peso de la Capa 1
-al error final (que se mide en la Salida), tenemos que aplicar **La Regla de La
-Cadena** a través de todas las capas intermedias. El gradiente que llega a la
-Capa 1 es el producto de las derivadas de las capas superiores. La derivada es
-como la velocidad a la que fluye la información del error. Si la derivada es
-alta (cercana a 1 o mayor): El error viaja con fuerza. El peso $w_1$ recibe un
-mensaje claro: *"¡Oye! Te has equivocado mucho, cambia tu valor rápido"*. Hay
-aprendizaje. Si la derivada es pequeña, el error se va atenuando en cada
-capa. ¿Por qué usamos derivadas? El objetivo de la red es minimizar una función
-de Error (o Pérdida). Imagina que el error es una montaña y tú estás en la cima,
-a ciegas. Quieres bajar al valle (error cero). ¿Cómo sabes hacia dónde dar el
+mover el peso para que el error total disminuya lo más rápido posible.  En una
+red neuronal, para saber cómo afecta un peso de la Capa 1 al error final (que se
+mide en la Salida), tenemos que aplicar **La Regla de La Cadena** a través de
+todas las capas intermedias. El gradiente que llega a la Capa 1 es el producto
+de las derivadas de las capas superiores. La derivada es como la velocidad a la
+que fluye la información del error. Si la derivada es alta (cercana a 1 o
+mayor): El error viaja con fuerza. El peso $w_1$ recibe un mensaje claro:
+*"¡Oye! Te has equivocado mucho, cambia tu valor rápido"*. Hay aprendizaje. Si
+la derivada es pequeña, el error se va atenuando en cada capa. ¿Por qué usamos
+derivadas? El objetivo de la red es minimizar una función de Error (o
+Pérdida). Imagina que el error es una montaña y tú estás en la cima, a
+ciegas. Quieres bajar al valle (error cero). ¿Cómo sabes hacia dónde dar el
 paso? Tocando el suelo con el pie para ver la pendiente. Esa pendiente es la
 derivada. Si la derivada es positiva, el terreno sube; vas hacia atrás. Si es
 negativa, el terreno baja; vas hacia adelante. El uso de la regla de la cadena
 es una cuestión de esto anterior. En definitiva una red neuronal es una función
-compuesta gigante. Si tenemos dos capas, la salida (Y) es:
+compuesta gigante. Si tenemos dos capas, una entrada $X$, una salida $Y$ y una
+función de activación $\sigma$. La función que resumiría la primera fase sería:
 
 $$
-Y = \mathrm{Activación}_2 \left(
-W_2 \cdot \mathrm{Activación}_1 \left(
+Y = \sigma_2 \left(
+W_2 \cdot \sigma_1 \left(
 W_1 \cdot X
 \right)
 \right)
@@ -249,7 +252,18 @@ derivadas de sus componentes**. Usamos la derivada de la activación porque es l
 única forma matemática de saber cuánta responsabilidad tiene una neurona
 específica en el error final. Esto es exactamente lo mismo que el análisis de
 sensibilidad en ingeniería de sistemas. ¿Cómo afecta una pequeña variación en la
-entrada a la salida del sistema? La respuesta es siempre la derivada.
+entrada a la salida del sistema? La respuesta es siempre la derivada. Si
+definimos el error como $E$ y recordamos que $\sigma'$ es la derivada de la
+función de activación, la fórmula compacta para calcular el gradiente de la
+primera capa (la más profunda en el Backpropagation) es:
+
+$$\delta_{1} = \underbrace{\left( \underbrace{\overbrace{(A_2 - y)}^\text{Error} \odot \sigma'(Z_2)}_{\text{Gradiente Salida } (\delta_2)} \cdot W_2^T \right)}_{\text{Error retropropagado}} \odot \sigma'(Z_1)$$
+
+1. El inicio del error: $(A_2 - y)$ calcula cuánto nos alejamos del objetivo.
+2. El filtro de la salida: Al multiplicar por $\odot \sigma'(Z_2)$, decidimos cuánta importancia dar a ese error según el estado de la neurona de salida.
+3. El salto al pasado: Al multiplicar por $W_2^T$, proyectamos ese error de la salida hacia las neuronas ocultas usando los mismos pesos (pero transpuestos).
+4. El filtro oculto: Finalmente, $\odot \sigma'(Z_1)$ ajusta ese error proyectado según la sensibilidad de la capa oculta.
+
 
 A continuación se muestra el bucle de aprendizaje de la multicapa implementada
 de forma completa en `src/multicapa.py`:
@@ -280,11 +294,21 @@ for epoch in range(epochs):
 
 ```
 
-En el código, la variable `d_predicted_output` ya representa la derivada del
-error respecto a la salida. Por tanto, para actualizar los pesos de la segunda
-capa ($W_2$), aplicamos la regla de la cadena: la variación del error depende de
-lo que salió de la capa anterior (`hidden_layer_output`) y del error final.
+Tras la aplicación del *forward pass* y el cálculo de la predicción vemos como
+empieza la siguiente fase, el *backpropagation*.  En el código, la variable
+`d_predicted_output` ya representa la derivada del error respecto a la salida. A
+esta variable la llamaremos también **Delta de salida** ($\delta_{out}$). Es
+básicamente el error ponderado por la pendiente o derivada de la función de
+activación. Necesitamos ponderar a la pendiente de la función para ver como de
+grande o pequeño tiene que ser el ajuste de los pesos.  Para seguir propagando
+este error hacia adentro, ahora calculamos el reajuste en la capa intermedia u
+«oculta».  Para actualizar los pesos de la segunda capa ($W_2$), aplicamos la
+regla de la cadena igualmente: la variación o delta del error en este caso
+depende del delta de salida anterior y de los pesos de esta capa. Esto lo
+guardamos en `error_hidden_layer` e igual que antes lo ponderamos a la derivada
+de la función de activación de esa capa. 
 
+Tras el cálculo de estas deltas comenzaría la fase de *Actualización de pesos*.
 La actualización de pesos en la salida la estamos haciendo en `W2 +=
 hidden_layer_output.T.dot(...) ...`. Aquí estamos calculando el gradiente para
 la matriz de pesos completa. Usamos la transpuesta (`.T`) porque queremos
@@ -302,28 +326,14 @@ controla la pendiente (la inclinación de la línea) pero el bias ($b$) controla
 la intersección con el eje Y (desplaza la línea hacia arriba o hacia abajo). Si
 solo ajustáramos los pesos, todas nuestras líneas de decisión tendrían que pasar
 obligatoriamente por el origen (0,0). El bias permite que la línea se mueva
-libremente por el espacio para rodear los datos donde sea que estén. ¿Por qué
-usamos `np.sum()` en el código a la hora de actualizar este bias? Vamos a
-detallar la estructura de la matriz de error llamada `d_predicted_output`. Es
-una matriz 4x1 con un error por cada fila o ejemplo del XOR:
-
-$$\delta = \begin{pmatrix} \text{error ejemplo 1} \\ \text{error ejemplo 2} \\ \text{error ejemplo 3} \\ \text{error ejemplo 4} \end{pmatrix}$$
-
-Sin embargo, solo tenemos un bias para esa neurona. No tenemos un bias por cada
-ejemplo. Por lo tanto, el ajuste del bias debe ser un valor único que resuma
-cómo debe cambiar la neurona para satisfacer (en promedio) a los 4 ejemplos. Por
-eso en Python escribimos `b2 += np.sum(d_predicted_output, axis=0,
-...)`. Estamos acumulando la presión de error de los 4 ejemplos para decidir si,
-en general, esa neurona debería tener un umbral más alto o más bajo.
+libremente por el espacio para rodear los datos donde sea que estén.
 
 ## Representación matricial
 
 Vamos a representar las diferentes matrices que más juego tienen en el ejemplo
 para visualizar mejor todo esto. Partimos de las dos matrices iniciales: la **matriz de datos de entrada** o $X$, donde la primera columna es la entrada $x_1$ y la segunda es $x_2$ y la **matriz de resultados esperados** o $y$:
 
-$$X = \begin{pmatrix} 0 & 0 \\ 0 & 1 \\ 1 & 0 \\ 1 & 1 \end{pmatrix}$$
-
-$$y = \begin{pmatrix} 0 \\ 1 \\ 1 \\ 0 \end{pmatrix}$$
+$$X = \begin{pmatrix} 0 & 0 \\ 0 & 1 \\ 1 & 0 \\ 1 & 1 \end{pmatrix} \hspace{1cm} y = \begin{pmatrix} 0 \\ 1 \\ 1 \\ 0 \end{pmatrix}$$
 
 ### Forward Pass
 
@@ -381,7 +391,7 @@ valor que la sigmoide convierta en casi 0.
 Entramos en la parte más profunda del backpropagation de la IA. Aquí es donde el
 error viaja hacia el pasado. Primeramente calculamos cuánto error hay en la
 salida final. Este valor también lo llamaremos **delta de salida** y se
-representa en código con la variable `d_predict_error`. Es el producto elemento
+representa en código con la variable `d_predicted_output`. Es el producto elemento
 a elemento (Hadamard product, representado por $\odot$) entre el error residual
 y la derivada de lo que salió. Esto nos devuelve finalmente una matriz $4 \times
 1$:
@@ -397,7 +407,7 @@ $$\text{Error}_{hidden} = \delta_{out} \times W_2^T$$
 
 $$\text{Error}_{hidden} = \begin{pmatrix} \delta_{out,1} \\ \delta_{out,2} \\ \delta_{out,3} \\ \delta_{out,4} \end{pmatrix} \times \begin{pmatrix} w'_{1} & w'_{2} \end{pmatrix} = \begin{pmatrix} \delta_{out,1} \cdot w'_{1} & \delta_{out,1} \cdot w'_{2} \\ \delta_{out,2} \cdot w'_{1} & \delta_{out,2} \cdot w'_{2} \\ \delta_{out,3} \cdot w'_{1} & \delta_{out,3} \cdot w'_{2} \\ \delta_{out,4} \cdot w'_{1} & \delta_{out,4} \cdot w'_{2} \end{pmatrix}$$
 
-El resultado es una matriz de $4 \times 2$. Cada columna representa cuánto"ruido
+El resultado es una matriz de $4 \times 2$. Cada columna representa cuánto ruido
 o error le llegó a cada una de las 2 neuronas ocultas. Finalmente, para saber
 cuánto debemos cambiar los pesos $W_1$, necesitamos filtrar ese error por la
 sensibilidad de la activación de la capa oculta. Es decir, multiplicamos por la
