@@ -9,6 +9,7 @@
 \usepackage{upquote}  %% para meter acentos libres en los listings (`)
 \usepackage{amsmath}  %% para meter texto en formulas con \text
 
+\setlength{\parskip}{0.5em}
 
 %% Configuración de las áreas de código usadas con "codigob"
 \lstset{frame=tblr,
@@ -25,8 +26,10 @@
   tabsize=4,
   literate={á}{{\'a}}1 {ñ}{{\~n}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
 }
-\lstnewenvironment{codigo}{\renewcommand\lstlistingname{codigo}}{}
-
+\lstnewenvironment{codigo}
+  {\renewcommand\lstlistingname{codigo}
+   \noindent\minipage{\linewidth}}
+  {\endminipage}
 
 
 % Redefino equation para meterle espacios antes y después
@@ -34,8 +37,8 @@
 \let\oldequation\equation
 \let\endoldequation\endequation
 \renewenvironment{equation}
-  {\vspace{10pt}\oldequation}
-  {\endoldequation\vspace{10pt}}
+  {\vspace{0.5em}\oldequation}
+  {\endoldequation\vspace{0.5em}}
 
 
 
@@ -161,6 +164,24 @@ los tenemos en el vector \texttt{y\_AND}:
   Recalculamos el sesgo: \texttt{self.bias\ +=\ error\ *\ self.lr}
 \end{enumerate}
 
+
+La magia se produce cuando tras probar el perceptrón con el vector de
+aprendizaje \texttt{y\_AND} y viendo que ha sabido hacer una operación
+AND cambiamos el vector por \texttt{y\_OR} y aprende a hacer una OR
+haciéndola correctamente para las mismas entradas.
+
+Siguiendo este razonamiento nos topamos con el primer gran problema del
+perceptrón. Al intentar implementar este mismo aprendizaje para XOR
+usando un vector \texttt{y\_XOR\ =\ np.array({[}0,\ 1,\ 1,\ 0{]})} vemos
+que es imposible. Si visualizamos el espacio de entrada como un plano
+con dos ejes y cuatro puntos (0,0),(0,1),(1,0),(1,1), vemos que en el
+AND, solo el punto (1,1) es positivo. Puedes dibujar una línea recta que
+separe ese punto de los otros tres. Lo mismo pasa en el OR donde tres
+puntos son positivos y solo el (0,0) es negativo. También puedes trazar
+una línea recta para separarlos.
+
+A continuación se muestra el código del fichero \texttt{src/perceptron.py}:
+
 \begin{codigo}
 class Perceptron:
     def __init__(self, n_inputs, learning_rate=0.1):
@@ -192,21 +213,6 @@ print("Probamos que sepa calcular un AND u OR:")
 for t in X:
     print(f"Entrada: {t} -> Prediccion: {p.predict(t)}")
 \end{codigo}
-
-La magia se produce cuando tras probar el perceptrón con el vector de
-aprendizaje \texttt{y\_AND} y viendo que ha sabido hacer una operación
-AND cambiamos el vector por \texttt{y\_OR} y aprende a hacer una OR
-haciéndola correctamente para las mismas entradas.
-
-Siguiendo este razonamiento nos topamos con el primer gran problema del
-perceptrón. Al intentar implementar este mismo aprendizaje para XOR
-usando un vector \texttt{y\_XOR\ =\ np.array({[}0,\ 1,\ 1,\ 0{]})} vemos
-que es imposible. Si visualizamos el espacio de entrada como un plano
-con dos ejes y cuatro puntos (0,0),(0,1),(1,0),(1,1), vemos que en el
-AND, solo el punto (1,1) es positivo. Puedes dibujar una línea recta que
-separe ese punto de los otros tres. Lo mismo pasa en el OR donde tres
-puntos son positivos y solo el (0,0) es negativo. También puedes trazar
-una línea recta para separarlos.
 
 
 \section{Redes multicapa}\label{multicapa}
@@ -443,7 +449,7 @@ fila \(i\) representa cómo ``ve'' la capa oculta el ejemplo \(i\) del
 XOR.
 
 \begin{equation}
-Z_1 = \left( \begin{pmatrix} 0 & 0 \\ 0 & 1 \\ 1 & 0 \\ 1 & 1 \end{pmatrix} \cdot \begin{pmatrix} w_{11} & w_{12} \\ w_{21} & w_{22} \end{pmatrix} \right) + (0,0)
+Z_1 = \left( \begin{pmatrix} 0 & 0 \\ 0 & 1 \\ 1 & 0 \\ 1 & 1 \end{pmatrix} \cdot \begin{pmatrix} w_{11} & w_{12} \\ w_{21} & w_{22} \end{pmatrix} \right) + (b_1,b_1)
 \end{equation}
 
 \begin{equation}A_1 = \sigma(Z_1) = \begin{pmatrix} \sigma(z_{11}) & \sigma(z_{12}) \\ \sigma(z_{21}) & \sigma(z_{22}) \\ \sigma(z_{31}) & \sigma(z_{32}) \\ \sigma(z_{41}) & \sigma(z_{42}) \end{pmatrix} = \begin{pmatrix} a_{1,1} & a_{1,2} \\ a_{2,1} & a_{2,2} \\ a_{3,1} & a_{3,2} \\ a_{4,1} & a_{4,2} \end{pmatrix}
@@ -457,11 +463,10 @@ obtener \(A_2\) o lo que es lo mismo, la \textbf{matriz de predicción
 final}:
 
 \begin{equation}
-Z_2 = \begin{pmatrix} a_{11} & a_{12} \\ a_{21} & a_{22} \\ a_{31} & a_{32} \\ a_{41} & a_{42} \end{pmatrix} \times \begin{pmatrix} w'_{1} \\ w'_{2} \end{pmatrix} + \begin{pmatrix} b_{2} \\ b_{2} \\ b_{2} \\ b_{2} \end{pmatrix}
-\end{equation}
-
-\begin{equation}
-Z_2 = \begin{pmatrix} (a_{11} \cdot w'_{1} + a_{12} \cdot w'_{2}) + b_{2} \\ (a_{21} \cdot w'_{1} + a_{22} \cdot w'_{2}) + b_{2} \\ (a_{31} \cdot w'_{1} + a_{32} \cdot w'_{2}) + b_{2} \\ (a_{41} \cdot w'_{1} + a_{42} \cdot w'_{2}) + b_{2} \end{pmatrix}
+Z_2 = \begin{pmatrix} a_{11} & a_{12} \\ a_{21} & a_{22} \\ a_{31} & a_{32}
+  \\ a_{41} & a_{42} \end{pmatrix} \times \begin{pmatrix} w'_{1}
+  \\ w'_{2} \end{pmatrix} + \begin{pmatrix} b_{2} \\ b_{2} \\ b_{2}
+  \\ b_{2} \end{pmatrix} = \begin{pmatrix} (a_{11} \cdot w'_{1} + a_{12} \cdot w'_{2}) + b_{2} \\ (a_{21} \cdot w'_{1} + a_{22} \cdot w'_{2}) + b_{2} \\ (a_{31} \cdot w'_{1} + a_{32} \cdot w'_{2}) + b_{2} \\ (a_{41} \cdot w'_{1} + a_{42} \cdot w'_{2}) + b_{2} \end{pmatrix}
 \end{equation}
 
 \begin{equation}
@@ -531,7 +536,7 @@ Para completar el ciclo, vamos a ver cómo ese error que ha viajado hacia
 atrás se convierte finalmente en instrucciones de ajuste para los pesos.
 En el código, estas son las líneas de Gradiente Descendente. La variable
 en el código que vamos a desarrollar ahora sería:
-\texttt{W2\ +=\ hidden\_layer\_output.T.dot(d\_predicted\_output)\ *\ learning\_rate.}
+\texttt{W2\ +=\ hidden\_layer\_output.T.dot(...)\ *\ learning\_rate.}
 En ella se actualizan los valores de \(W2\). Para ajustar esos pesos
 (recordamos que són los que conectan la capa oculta con la salida),
 multiplicamos la activación que salió de la capa oculta (\(A_1^T\)) y
@@ -563,15 +568,16 @@ capa oculta (\(\delta_{hidden}\)). El resultado es una matriz de
 \delta_{h2,i}) \\ \sum (x_{i2} \cdot \delta_{h1,i}) & \sum (x_{i2} \cdot
 \delta_{h2,i}) \end{pmatrix}\end{equation}
 
-Es importante fijarse en la belleza de la operación
-\(X^T \cdot \delta_{hidden}\). Si la entrada \(x_{11}\) fue 0, no
-importa cuán grande sea el error \(\delta_{h1,1}\), el producto será 0.
-Esto tiene todo el sentido lógico: si una entrada fue cero, no pudo
-haber contribuido al error final de esa neurona, por lo tanto, no hay
-razón para cambiar el peso que viene de ella.
+Es importante fijarse en la belleza de la operación \(X^T \cdot
+\delta_{hidden}\). Si la entrada \(x_{11}\) fue 0, no importa cuán grande sea el
+error \(\delta_{h1,1}\), el producto será 0.  Esto tiene todo el sentido lógico:
+si una entrada fue cero, no pudo haber contribuido al error final de esa
+neurona, por lo tanto, no hay razón para cambiar el peso que viene de ella. 
 
-Para terminar dejamos aquí una relación entre las variables usadas en el
-código fuente y su simbología matemática utilizada en el desarrollo:
+
+Para terminar dejamos aquí una relación entre las variables usadas en el código
+fuente y su simbología matemática utilizada en el desarrollo:
+
 
 \begin{itemize}
 \item
@@ -609,7 +615,6 @@ código fuente y su simbología matemática utilizada en el desarrollo:
   escala de los ajustes.
 \end{itemize}
 
-\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
 
 \section{Anotaciones}
