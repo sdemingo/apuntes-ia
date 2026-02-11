@@ -20,4 +20,3 @@ doc: apuntes.tex
 
 clean:
 	latexmk -c
-	rm -rf $(OUT_DIR)
