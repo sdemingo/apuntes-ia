@@ -20,3 +20,4 @@ doc: apuntes.tex
 
 clean:
 	latexmk -c
+	rm -r pdf/*.aux pdf/*_latexmk pdf/*.fls pdf/*.log
