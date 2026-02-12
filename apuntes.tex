@@ -623,6 +623,60 @@ fuente y su simbología matemática utilizada en el desarrollo:
 \end{itemize}
 
 
+\subsection{Estudio del error y del aprendizaje}
+
+En la gráfica que se muestra a continuación se ve un estudio de como
+evoluciona el error en las diferentes iteraciones del aprendizaje con
+diferentes tasas de aprendizaje \(\eta\). Recordamos que para calcular
+el error durante el aprendizaje usamos en cada iteración la formula del
+Error Cuadrático Medio aunque realmente lo que propagábamos era su
+derivada. Con \texttt{square()} elevamos cada miembro del array al
+cuadrado y con \texttt{mean()} calculamos la media de todos los valores
+del vector de errores. Si se usa una tasa muy grande como \(\eta = 10\)
+el modelo ``saltará'' tan fuerte que nunca caerá en el valle del error.
+Verás que los resultados oscilan locamente. Por contra si usamos una
+tasa muy baja el modelo tardará millones de épocas en aprender. Es como
+intentar vaciar el océano con una cuchara.
+
+ 
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{./img/tasas-aprendizaje.png}
+\caption{Evolución del error con diferentes tasas de aprendizaje}
+\end{figure}
+
+
+Usamos una tasa intermedia (\(\eta=0.5\)). Verás que al principio el
+error baja muy poco (la red está explorando), luego hay una caída
+vertical pronunciada (ha encontrado la lógica del XOR) y finalmente se
+estabiliza cerca de cero. Si el error se queda plano en un valor alto
+(por ejemplo, 0.25), significa que la red se ha quedado atrapada en un
+mínimo local. En el XOR, esto suele significar que la red ha decidido
+que «la mejor opción es decir siempre 0.5», porque no logra entender
+la lógica no lineal. En estos casos es posible que necesitemos reiniciar
+la red debido a la mala asignación de pesos aleatoria al comienzo. Como
+los pesos iniciales son aleatorios, a veces la red empieza en una
+posición «desafortunada» del mapa matemático. Se pueden utilizar otras
+técnicas (como Xavier/Glorot) para realizar una preasignación más
+eficiente que la simplemente aleatoria.
+
+Si el error colapsa hacia cero alrededor de las 1500 iteraciones (como
+en el caso de usar \(\eta = 0.5\)) en un problema como el XOR, significa
+que la tasa de aprendizaje está muy bien balanceada. Que la curva baje
+muy rápido tampoco es siempre un buen síntoma. Por ejemplo, si cayera a
+las 10 iteraciones: Sospecharíamos de overfitting (sobreajuste) o de que
+el problema es demasiado simple para la potencia de la red. A veces
+también puede ocurrir que una caída rápida se detiene en seco antes de
+llegar a cero. Eso significa que la red «se ha rendido» en un punto que
+le parece aceptable pero que no es la solución óptima. Para confirmar
+que esa tasa de 1500 es perfecta, haz esta prueba: fíjate en el final de
+la curva. Si es plana y suave al final tu tasa es perfecta. La red ha
+aterrizado suavemente en el mínimo. Si el final de la curva tiene ruido
+(pequeños dientes de sierra) tu tasa es un poco alta. La red ha llegado
+al fondo pero está rebotando un poco en las paredes del valle.
+
+
+
 
 %% \section{Anotaciones}
 

@@ -1,5 +1,5 @@
 import numpy as np
-
+import matplotlib.pyplot as plt
 
 # X (Entrada): (4,2) — 4 combinaciones de 2 entradas.
 # W1  (Pesos Ocultos): (2,2) — Conecta 2 entradas con 2 neuronas ocultas.
@@ -43,6 +43,7 @@ b2 = np.zeros((1, output_neurons))
 
 learning_rate = 0.5
 epochs = 10000
+errors=[]
 
 # 4. Bucle de entrenamiento
 for epoch in range(epochs):
@@ -59,6 +60,9 @@ for epoch in range(epochs):
     # A. ¿Cuánto nos equivocamos en la salida?
     error = y - predicted_output
     
+    # Calculo el Error Cuadrático Medio. (solo se usa para la gráfica del error)
+    errors.append(np.mean(np.square(error))) 
+
     # B. Gradiente en la salida (Error * Derivada de la activación)
     d_predicted_output = error * sigmoid_derivative(predicted_output)
     
@@ -71,8 +75,20 @@ for epoch in range(epochs):
     b2 += np.sum(d_predicted_output, axis=0, keepdims=True) * learning_rate
     W1 += X.T.dot(d_hidden_layer) * learning_rate
     b1 += np.sum(d_hidden_layer, axis=0, keepdims=True) * learning_rate
-
+    
+    # Resultados tras cada entrenamiento
+    #print(list(predicted_output))
+    #print()
 
 # 5. Verificación final
 print("Resultados después del entrenamiento:")
 print(predicted_output)
+
+
+# --- Al finalizar el entrenamiento, graficamos ---
+plt.plot(errors)
+plt.title(f'Tasa de aprendizaje = {learning_rate}')
+plt.xlabel('Épocas')
+plt.ylabel('Error (Loss)')
+plt.grid(True)
+plt.show()
