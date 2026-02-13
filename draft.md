@@ -5,7 +5,7 @@ toc: true
 title: "Apuntes sobre IA"
 author: "Sergio de Mingo"
 date: "2 de febrero de 2026"
-header-includes: |
+header-includes: | 
   \lstset{
     frame=single,
     framesep=5pt,
@@ -37,6 +37,20 @@ un *batch* o lote de 64 imágenes, $X$ será [64×784]. La salida $Y$ ya no es u
 solo valor. Ahora necesitamos saber la probabilidad de que sea un 0, un 1, un
 2... hasta el 9. Por tanto, la salida tiene 10 neuronas.
 
+Para procesar las imágenes comenzaremos aplicando un proceso de aplanamiento o
+*flattering*. Una imagen del dataset MNIST es una cuadrícula de 28×28
+píxeles. Cada píxel tiene un valor (normalmente de 0 a 255, que luego
+normalizamos a [0,1]) que indica qué tan oscuro es ese punto. Como nuestras
+capas ocultas esperan un vector (una fila de entradas), no podemos meterle un
+"cuadrado". Tenemos que desenrollar o aplanar la imagen. El proceso es justo un
+aplanamiento pues tomamos la primera fila de 28 píxeles, luego pegamos la
+segunda fila a continuación, luego la tercera, y así sucesivamente hasta la fila
+28. Pasamos de un tensor de [28,28] a un vector de [784]. Si tenemos un *batch*
+    o lote de, por ejemplo, 100 imágenes, nuestra matriz de entrada X para la
+    red tendrá unas dimensiones de: X=[100×784]. Esto significa que cada fila de
+    tu matriz es una imagen completa pero estirada.
+
+
 En el XOR usamos la Sigmoide, pero para redes más profundas existe un problema
 importante con esta función: El gradiente desvanesciente o *Vanishing
 Gradient*, del que hablaremos a continuación. Otro problema ahora es que en la
@@ -52,23 +66,10 @@ $$
 \text{softmax}(x_i) = \frac{e^{x_i}}{\sum e^{x_j}}
 $$
 
-En la red multicapa usamos para calcular el error que propagábamos la función
-del Error Cuadrático Medio. Realmente usábamos su derivada justo en la línea
-`error = y - predicted_output`. Si vemos la función del error cuadrático medio o
-$E$ entendemos que su derivada sea la indicada en el código. El $\frac{1}{2}$ se
-añade por pura conveniencia matemática para que se cancele al derivar:
-
-$$
-E = \frac{1}{2}(y - \hat{y})^2 \hspace{1cm} \frac{\partial E}{\partial \hat{y}} = -(y - \hat{y})
-$$
-
-En esta nueva red para reconocer patrones usaremos una nueva función para
-calcular el error llamada **Entropía cruzada** o *Cross Entropy*. Su derivada es
-mucho más agresiva. Si la red está muy segura de que un número es un "3" pero en
-realidad es un "8", la Cross-Entropy genera un gradiente gigantesco para obligar
-a la red a cambiar rápido. 
-
-Esta nueva red tendrá la siguiente estructura:
+Otro cambio importante es el cálculo del error. Ahora usaremos la función de la
+**Entropía cruzada** o *Cross Entropy* de la que hablaremos más adelante. La
+principal ventaja de esta función es que aumenta la rapidez del aprendizaje de
+la red. En resumen, esta nueva red tendrá la siguiente estructura:
 
 * **Capa de Entrada** ($X$): Ya no son 2 bits. Aplanamos la imagen en un vector
   de $784$ neuronas. Pues cada imagen se aplana en un vector de $28x28 = 784$.
@@ -92,10 +93,9 @@ $$A_2 = \text{Softmax}(Z_2)$$
 El primer cambio se aprecia en $W_1$ donde vemos que tiene 100,352 pesos
 (784×128). Esto es solo en la primera capa. El aumento de la complejidad es
 apreciable pues pasamos de tener que reajustar apenas 4 pesos en esta primera
-capa en el ejemplo anterior a más de 100 mil en este modelo.
-
-Vamos ahora a resumir el bucle de entrenamiento igual que hicimos en la red
-multicapa clásica del ejemplo para el XOR:
+capa en el ejemplo anterior a más de 100 mil en este modelo. Vamos ahora a
+resumir el bucle de entrenamiento igual que hicimos en la red multicapa clásica
+del ejemplo para el XOR:
 
 ```
 for epoch in range(epochs):
@@ -170,16 +170,90 @@ importante debido a que es una función mucho más sencilla de computar (un simp
 muy fuerte y sus pesos se vuelven tan negativos que su entrada siempre es $<0$,
 su salida será siempre 0 y su derivada siempre 0. Esa neurona «muere» y deja de
 aprender para siempre. De ahí que también usemos variantes como Leaky ReLU que
-deja pasar un poquito de información negativa ($0.01x$) para que la neurona tenga
+deja pasar un poquito de información negativa (0.01x) para que la neurona tenga
 una oportunidad de «resucitar».
 
 
+## Propagación del error con entropía cruzada
+
+En la red multicapa usamos para calcular el error que propagábamos la función
+del Error Cuadrático Medio o MSE. Realmente usábamos su derivada justo en la
+línea `error = y - predicted_output`. Si vemos la función del error cuadrático
+medio o $E$ entendemos que su derivada sea la indicada en el código. El
+$\frac{1}{2}$ se añade por pura conveniencia matemática para que se cancele al
+derivar:
+
+$$
+E = \frac{1}{2}(y - \hat{y})^2 \hspace{1cm} \frac{\partial E}{\partial \hat{y}} = -(y - \hat{y})
+$$
+
+En esta nueva red para reconocer patrones usaremos una nueva función para
+calcular el error llamada **Entropía cruzada** o *Cross Entropy*. Su derivada es
+mucho más agresiva. Si la red está muy segura de que un número es un "3" pero en
+realidad es un "8", la Cross-Entropy genera un gradiente gigantesco para obligar
+a la red a cambiar rápido. 
+
+Una vez que la red ha procesado ese vector de 784 píxeles a través de las capas
+y llegamos a la salida, tenemos 10 neuronas (una por cada dígito). Gracias a la
+función Softmax, estas 10 neuronas nos dan probabilidades ya que convierte
+números brutos en una «repartición de apuestas» o distribución de
+probabilidades. Supongamos que le pasamos la imagen de un "3". En ese caso
+tendremos un vector de salida esperada $y$ que compararemos con el vector de
+salida predicha u obtenida $\hat{y}$. Para interpretar bien ambos vectores hay
+que entender que el primer número es la salida de la primera neurona (la
+asociada al "0"), el segundo el de la segunda neurona o la asociada al "1" y así
+para todo el vector.
+
+$$
+y = [0,0,0,1,0,0,0,0,0,0]
+$$
+    
+$$
+\hat{y}=[0.01, 0.02, 0.05, \underline{0.70}, 0.02, 0.10, 0.0, 0.0, 0.10, 0.0]
+$$
+
+El error (L) se calcula solo mirando la neurona que debería haber acertado. Esto
+es la cuarta o la correspondiente al número tres con un resultado de
+$0.70$. Como en el vector $y$ casi todos son cero, la fórmula se reduce a:
+
+$$
+L = -\sum_{i=0}^{9} y_i \cdot \ln(\hat{y}_i) =  -\ln(\hat{y}_4)
+$$
 
 
+Aunque la fórmula del Softmax es compleja y la de la Entropía Cruzada tiene
+logaritmos, cuando calculas la derivada para el *Backpropagation* para saber
+cuánto error enviar atrás, ocurre una simplificación mágica: 
+
+$$
+\frac{\partial L}{\partial Z_2} = \hat{y} - y
+$$ 
+
+Es exactamente la misma resta simple usábamos en el XOR anteriormente. Si la red
+dijo 0.70 para el "3" y la realidad era 1.0, el error es $-0.30$. Si la red dijo
+0.10 para el "5" y la realidad era 0.0, el error es $0.10$.  Esa diferencia es
+la que fluye hacia atrás para ajustar los 100,000 pesos de tu red. Vamos ahora a
+explicar la mejora que obtenemos usando esta función frente al MSE
+anterior. Cuando usas MSE con una Sigmoide, la red sufre un fenómeno llamado
+Saturación. Si la red está muy equivocada (por ejemplo, la salida real es 1 pero
+la red predice 0.001), el valor de la predicción está en la zona plana de la
+sigmoide. Al calcular el error para el backpropagation, multiplicas por la
+derivada de la sigmoide:
 
 
+$$\text{Gradiente} = (y - \hat{y}) \cdot \underbrace{\sigma'(z)}_{\text{¡Casi cero!}}$$
 
-
-
+Aunque el error $(y - \hat{y})$ es muy grande (casi 1), al multiplicarlo por una
+derivada que es casi 0, el gradiente final es diminuto. La red se queda
+atascada: sabe que está mal, pero no tiene fuerza para moverse porque la
+pendiente es plana. Cuando usas Cross-Entropy, la función de coste está diseñada
+específicamente para cancelar esa zona plana de la sigmoide (o softmax).  La
+Cross-Entropy tiene un logaritmo ($\ln$) cuya derivada es $1/x$. Al aplicar la
+regla de la cadena para obtener el gradiente, el término que "aplastaba" el
+aprendizaje en la sigmoide desaparece matemáticamente. Mientras que con MSE si
+la red falla por mucho, el gradiente es pequeño (porque la sigmoide es plana al
+final) y el aprendizaje es lento al principio, con Cross-Entropy: Si la red
+falla por mucho, el gradiente es máximo. Cuanto más equivocada está la red, más
+fuerte es el «latigazo» que la obliga a corregir.
 
 

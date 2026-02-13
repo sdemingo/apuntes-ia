@@ -10,7 +10,7 @@ PDF_OUT = pdf/draft.pdf
 
 $(PDF_OUT): draft.md
 	mkdir -p $(OUT_DIR)
-	pandoc draft.md -o $(OUT_DIR)/draft.pdf --listings -Vlang=es-ES
+	pandoc draft.md -o $(OUT_DIR)/draft.pdf --listings #-Vlang=es-ES
 
 draft: $(PDF_OUT)
 
