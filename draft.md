@@ -24,4 +24,8 @@ header-includes: |
 
 # Redes Neuronales Convolucionales
 
-CNN ..
+Anteriormente aplanamos una imagen de 28×28 a 784. Al hacer eso, la red ya no
+sabe si el píxel 1 está al lado del píxel 2 o del píxel 28. Simplemente ve una
+lista de números. Piensa en esto: ¿Cómo podrías tú reconocer una cara si te
+dieran todos los píxeles de una foto mezclados en una bolsa? Sería
+imposible. Las CNN vienen a resolver precisamente eso.
