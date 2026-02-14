@@ -690,4 +690,537 @@ al fondo pero está rebotando un poco en las paredes del valle.
 %% \end{itemize}
 
 
+\section{Reconocimiento de patrones}
+
+Hasta ahora, tu red solo ha tenido que distinguir entre 4 combinaciones.
+Pero, ¿qué pasa cuando la entrada no son dos bits (0 o 1), sino una
+imagen de 28x28 píxeles de un número de 0 a 9 escrito a mano? El dataset
+MNIST es el ``Hola Mundo'' del Deep Learning. Son imágenes de dígitos
+del 0 al 9. MNIST Es una extensa colección de base de datos que se
+utiliza ampliamente para el entrenamiento de diversos sistemas de
+procesamiento de imágenes. La base de datos MNIST consta de 60.000
+imágenes de entrenamiento y 10.000 imágenes de prueba. Ahora nuestra
+entrada \(X\) ya no es una matriz de 4×2. Ahora cada imagen se aplana en
+un vector de 784 números (28 píxeles x 28 píxeles). Si procesamos un
+\emph{batch} o lote de 64 imágenes, \(X\) será {[}64×784{]}. La salida
+\(Y\) ya no es un solo valor. Ahora necesitamos saber la probabilidad de
+que sea un 0, un 1, un 2\ldots{} hasta el 9. Por tanto, la salida tiene
+10 neuronas.
+
+Para procesar las imágenes comenzaremos aplicando un proceso de
+aplanamiento o \emph{flattering}. Una imagen del dataset MNIST es una
+cuadrícula de 28×28 píxeles. Cada píxel tiene un valor (normalmente de 0
+a 255, que luego normalizamos a {[}0,1{]}) que indica qué tan oscuro es
+ese punto. Como nuestras capas ocultas esperan un vector (una fila de
+entradas), no podemos meterle un ``cuadrado''. Tenemos que desenrollar o
+aplanar la imagen. El proceso es justo un aplanamiento pues tomamos la
+primera fila de 28 píxeles, luego pegamos la segunda fila a
+continuación, luego la tercera, y así sucesivamente hasta la fila 28.
+Pasamos de un tensor de {[}28,28{]} a un vector de {[}784{]}. Si tenemos
+un \emph{batch} o lote de, por ejemplo, 100 imágenes, nuestra matriz de
+entrada X para la red tendrá unas dimensiones de: X={[}100×784{]}. Esto
+significa que cada fila de tu matriz es una imagen completa pero
+estirada.
+
+En el XOR usamos la Sigmoide, pero para redes más profundas existe un
+problema importante con esta función: El gradiente desvanesciente o
+\emph{Vanishing Gradient}, del que hablaremos a continuación. Otro
+problema ahora es que en la salida necesitamos varias neuronas, en
+concreto 10. Así cada una nos devolverá una probabilidad de que el
+patrón de la entrada es el número asociado a ellas. En el XOR, la salida
+era un valor entre 0 y 1. En clasificación de números, queremos que la
+red nos diga: «Estoy un 80\% seguro de que es un `5', un 15\% de que es
+un `3' y un 5\% de que es un `6'». Para esto usamos la función Softmax
+en la última capa. Lo que hace es agarrar los valores brutos de salida y
+convertirlos en una distribución de probabilidad que suma exactamente
+100\%.
+
+\[
+\text{softmax}(x_i) = \frac{e^{x_i}}{\sum e^{x_j}}
+\]
+
+Otro cambio importante es el cálculo del error. Ahora usaremos la
+función de la \textbf{Entropía cruzada} o \emph{Cross Entropy} de la que
+hablaremos más adelante. La principal ventaja de esta función es que
+aumenta la rapidez del aprendizaje de la red. En resumen, esta nueva red
+tendrá la siguiente estructura:
+
+\begin{itemize}
+\item
+  \textbf{Capa de Entrada} (\(X\)): Ya no son 2 bits. Aplanamos la
+  imagen en un vector de \(784\) neuronas. Pues cada imagen se aplana en
+  un vector de \(28x28 = 784\).
+\item
+  \textbf{Capa Oculta}: Digamos que elegimos 128 neuronas para que la
+  red tenga ``memoria'' suficiente para las formas de los números.
+\item
+  \textbf{Capa de Salida}: Ahora necesitamos 10 neuronas (una para cada
+  dígito del 0 al 9).
+\end{itemize}
+
+El desarrollo matricial ahora nos quedaría de la siguiente forma:
+
+\[Z_1 = X_{batch \times 784} \cdot W_{1 (784 \times 128)} + b_{1 (128)}\]
+
+\[A_1 = \text{ReLU}(Z_1)\]
+
+\[Z_2 = A_{1 (batch \times 128)} \cdot W_{2 (128 \times 10)} + b_{2 (10)}\]
+
+\[A_2 = \text{Softmax}(Z_2)\]
+
+El primer cambio se aprecia en \(W_1\) donde vemos que tiene 100,352
+pesos (784×128). Esto es solo en la primera capa. El aumento de la
+complejidad es apreciable pues pasamos de tener que reajustar apenas 4
+pesos en esta primera capa en el ejemplo anterior a más de 100 mil en
+este modelo. Vamos ahora a resumir el bucle de entrenamiento igual que
+hicimos en la red multicapa clásica del ejemplo para el XOR:
+
+\begin{codigo}
+for epoch in range(epochs):
+    # 1. Forward Pass con Softmax
+    z1 = np.dot(X_train, W1) + b1
+    a1 = relu(z1)  # Cambiamos Sigmoide por ReLU
+    
+    z2 = np.dot(a1, W2) + b2
+    predicted_output = softmax(z2) 
+    
+    # 2. El gradiente con la Cross-Entropy
+    d_output = predicted_output - y_train 
+    
+    # 3. Backpropagation
+    error_hidden = d_output.dot(W2.T)
+    d_hidden = error_hidden * relu_derivative(z1)
+    
+    # 4. Actualizacion
+    W2 -= learning_rate * a1.T.dot(d_output)
+    W1 -= learning_rate * X_train.T.dot(d_hidden)
+\end{codigo}
+
+En el XOR, tu salida era un punto. Aquí, tu salida es una distribución.
+Si la red ve un ``3'' escrito de forma extraña, la neurona del ``3'' se
+encenderá mucho (digamos 0.7), pero la del ``8'' también podría
+encenderse un poco (0.2) porque se parecen. El Softmax es el que
+gestiona esa competencia entre neuronas. El valor que devuelve en
+\texttt{predicted\_output} será siempre un vector que sume 1 (por
+ejemplo \texttt{{[}0.1,\ 0.0,\ 0.8,\ ...{]}}). El gradiente de la
+Entropia cruzada es sorprendentemente simple: \# (Predicción -
+Realidad). Si y\_train es {[}0, 0, 1, 0\ldots{]} (es un `2') \# y
+predicted es {[}0.1, 0.1, 0.7, 0.1\ldots{]}, el error es la diferencia.
+La fase de propagación del error hacia atrás es similar aunque ahora
+usaremos la derivada de ReLU.
+
+
+
+\subsection{ReLU y el gradiente desvanesciente}
+
+El paso de Sigmoide a ReLU (Rectified Linear Unit) es, probablemente, el
+avance más sencillo pero más importante que permitió que las redes
+neuronales pasaran de tener 2 capas a tener cientos. Ya se ha explicado
+anteriormente el problema del gradiente desvanesciente. Si observamos la
+curva de la sigmoide, vemos que sus valores de entrada están comprimidos
+entre el 0 y el 1.
+
+\begin{figure}[h]
+\centering
+\includegraphics[scale=0.5]{./img/sigmoide.png}
+\caption{Curva de la sigmoide y su derivada}
+\end{figure}
+
+El problema se encuentra en su derivada cuyo valor máximo es 0.25. Eso
+es cuando la entrada es 0. Si no lo es, este valor se va rápidamente a
+0. En una red con múltiples capas como puede ser la necesaria para MNIST
+necesitamos aplicar la regla de la cadena con todas ellas y acabamos
+multiplicando valores muy pequeños (0.25 en el mayor de los casos) o
+incluso 0. El resultado es que las capas profundas y cercanas a la
+salida si «aprenden» algo y actualizan sus pesos pero a medida que nos
+acercamos a las primeras capas, a estas les llega el delta casi reducido
+a 0 y por lo tanto no ajustarán sus pesos nada, ni se producirá
+aprendizaje alguno. Para solucionar esto usaremos ReLU, cuya función
+está formulada anteriormente. ReLU es una función ``a trozos''
+extremadamente simple, y ahí reside su genio:
+
+\[
+f(x) = \begin{cases} 
+      0 & \text{si } x \le 0 \\
+      x & \text{si } x > 0 
+   \end{cases}
+\]
+
+Su derivada es la clave pues es similar. Para el primer caso es 1 y para
+el segundo caso es 0. Al multiplicar gradientes en la Regla de la
+Cadena, multiplicar por 1 no reduce la señal. El error viaja íntegro
+desde la salida hasta la entrada, sin importar cuántas capas haya por
+medio. Esto permite que las redes sean mucho más profundas. Además se
+produce una mejora computacional importante debido a que es una función
+mucho más sencilla de computar (un simple \texttt{if}). ReLU tiene un
+pequeño riesgo. Si una neurona recibe un golpe de gradiente muy fuerte y
+sus pesos se vuelven tan negativos que su entrada siempre es \(<0\), su
+salida será siempre 0 y su derivada siempre 0. Esa neurona «muere» y
+deja de aprender para siempre. De ahí que también usemos variantes como
+Leaky ReLU que deja pasar un poquito de información negativa (0.01x)
+para que la neurona tenga una oportunidad de «resucitar».
+
+
+\subsection{Propagación del error con entropía cruzada}
+
+En la red multicapa usamos para calcular el error que propagábamos la
+función del Error Cuadrático Medio o MSE. Realmente usábamos su derivada
+justo en la línea \texttt{error\ =\ y\ -\ predicted\_output}. Si vemos
+la función del error cuadrático medio o \(E\) entendemos que su derivada
+sea la indicada en el código. El \(\frac{1}{2}\) se añade por pura
+conveniencia matemática para que se cancele al derivar:
+
+\[
+E = \frac{1}{2}(y - \hat{y})^2 \hspace{1cm} \frac{\partial E}{\partial \hat{y}} = -(y - \hat{y})
+\]
+
+En esta nueva red para reconocer patrones usaremos una nueva función
+para calcular el error llamada \textbf{Entropía cruzada} o \emph{Cross
+Entropy}. Su derivada es mucho más agresiva. Si la red está muy segura
+de que un número es un ``3'' pero en realidad es un ``8'', la
+Cross-Entropy genera un gradiente gigantesco para obligar a la red a
+cambiar rápido.
+
+Una vez que la red ha procesado ese vector de 784 píxeles a través de
+las capas y llegamos a la salida, tenemos 10 neuronas (una por cada
+dígito). Gracias a la función Softmax, estas 10 neuronas nos dan
+probabilidades ya que convierte números brutos en una «repartición de
+apuestas» o distribución de probabilidades. Supongamos que le pasamos la
+imagen de un ``3''. En ese caso tendremos un vector de salida esperada
+\(y\) que compararemos con el vector de salida predicha u obtenida
+\(\hat{y}\). Para interpretar bien ambos vectores hay que entender que
+el primer número es la salida de la primera neurona (la asociada al
+``0''), el segundo el de la segunda neurona o la asociada al ``1'' y así
+para todo el vector.
+
+\[
+y = [0,0,0,1,0,0,0,0,0,0]
+\]
+
+\[
+\hat{y}=[0.01, 0.02, 0.05, \underline{0.70}, 0.02, 0.10, 0.0, 0.0, 0.10, 0.0]
+\]
+
+El error (L) se calcula solo mirando la neurona que debería haber
+acertado. Esto es la cuarta o la correspondiente al número tres con un
+resultado de \(0.70\). Como en el vector \(y\) casi todos son cero, la
+fórmula se reduce a:
+
+\[
+L = -\sum_{i=0}^{9} y_i \cdot \ln(\hat{y}_i) =  -\ln(\hat{y}_4)
+\]
+
+Aunque la fórmula del Softmax es compleja y la de la Entropía Cruzada
+tiene logaritmos, cuando calculas la derivada para el
+\emph{Backpropagation} para saber cuánto error enviar atrás, ocurre una
+simplificación mágica:
+
+\[
+\frac{\partial L}{\partial Z_2} = \hat{y} - y
+\]
+
+Es exactamente la misma resta simple usábamos en el XOR anteriormente.
+Si la red dijo 0.70 para el ``3'' y la realidad era 1.0, el error es
+\(-0.30\). Si la red dijo 0.10 para el ``5'' y la realidad era 0.0, el
+error es \(0.10\). Esa diferencia es la que fluye hacia atrás para
+ajustar los 100,000 pesos de tu red. Vamos ahora a explicar la mejora
+que obtenemos usando esta función frente al MSE anterior. Cuando usas
+MSE con una Sigmoide, la red sufre un fenómeno llamado Saturación. Si la
+red está muy equivocada (por ejemplo, la salida real es 1 pero la red
+predice 0.001), el valor de la predicción está en la zona plana de la
+sigmoide. Al calcular el error para el backpropagation, multiplicas por
+la derivada de la sigmoide:
+
+\[\text{Gradiente} = (y - \hat{y}) \cdot \underbrace{\sigma'(z)}_{\text{¡Casi cero!}}\]
+
+Aunque el error \((y - \hat{y})\) es muy grande (casi 1), al
+multiplicarlo por una derivada que es casi 0, el gradiente final es
+diminuto. La red se queda atascada: sabe que está mal, pero no tiene
+fuerza para moverse porque la pendiente es plana. Cuando usas
+Cross-Entropy, la función de coste está diseñada específicamente para
+cancelar esa zona plana de la sigmoide (o softmax). La Cross-Entropy
+tiene un logaritmo (\(\ln\)) cuya derivada es \(1/x\). Al aplicar la
+regla de la cadena para obtener el gradiente, el término que
+``aplastaba'' el aprendizaje en la sigmoide desaparece matemáticamente.
+Mientras que con MSE si la red falla por mucho, el gradiente es pequeño
+(porque la sigmoide es plana al final) y el aprendizaje es lento al
+principio, con Cross-Entropy: Si la red falla por mucho, el gradiente es
+máximo. Cuanto más equivocada está la red, más fuerte es el «latigazo»
+que la obliga a corregir.
+
+
+\subsection{Arquitectura de red para MNIST}
+
+En el XOR solo necesitabas una capa para separar puntos. Para reconocer
+números (MNIST), la primera capa oculta puede aprender a detectar bordes
+y líneas, mientras que la segunda capa combina esos bordes para
+reconocer curvas y círculos (como los de un ``8'' o un ``0''). Vamos a
+seguir un esquema entonces a 4 capas:
+\([768 \rightarrow 128 \rightarrow 64 \rightarrow 10]\):
+
+\begin{itemize}
+\item
+  Entrada (\(X\)): {[}Batch×784{]} Lote de imágenes aplanadas.
+\item
+  Capa Oculta 1 (\(W_1\)): {[}784×128{]}. Transforma píxeles en rasgos
+  básicos.
+\item
+  Capa Oculta 2 (\(W_2\)): {[}128×64{]}. Transforma rasgos básicos en
+  formas complejas.
+\item
+  Capa de Salida (\(W_3\)): {[}64×10{]}. Clasifica las formas en dígitos
+  del 0 al 9.
+\end{itemize}
+
+Usaremos dos capas debido a que se gana eficiencia en este reparto de
+tareas. La profundidad suele ser sinónimo de inteligencia en una red
+neuronal. Esta profundidad permite a la red entender conceptos
+jerárquicos. El ancho de la red permite recordar muchos detalles
+específicos. A mayor ancho la red tiene más capacidad de memoria.
+Respecto al dimensionado de las capas diremos que, mientras que el 128
+de la capa de entrada es una obligación física para almacenar el
+aplanado de las imágenes (explicado en el apartado anterior), el 128 y
+el 64 de las capas siguientes son una decisión de diseño. Para el 128 no
+hay una ley física que marque. Podría ser 100, 200 o 512. Sin embargo,
+en computación usamos potencias de 2 (\(2^7=128\)) porque las GPUs y
+CPUs gestionan mucho más rápido la memoria en bloques de este tamaño.
+Con el 64 pasa lo mismo. Se han diseñado ambas capas como un embudo:
+Empiezas con 784 detalles brutos (píxeles sueltos, la primera capa los
+resume en 128 rasgos (líneas, ángulos, bordes), la segunda capa resume
+esos rasgos en 64 conceptos más complejos (curvas cerradas, cruces) y
+finalmente todo se reduce a 10 categorías (los dígitos). Podemos jugar a
+modificar estos números. Si pones números muy pequeños, la red tiene un
+«cuello de botella». Estás intentando resumir mucha información en muy
+pocas neuronas. La red será muy rápida, pero probablemente sea menos
+inteligente y no aprenda bien los detalles. Mientras que si pones
+números muy grandes la red tendrá una memoria fotográfica increíble. El
+problema es que será muy lenta de entrenar y, lo más peligroso, podría
+sufrir de Overfitting, asunto del que hablaremos a continuación. No
+debemos olvidar además que para que la multiplicación de matrices
+funcione, la regla es que \textbf{la salida de una capa debe ser la
+entrada de la siguiente}. Resumimos por tanto como queda el proceso
+matricial o \emph{Forward Pass}:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  Capa 1: \(Z_1=X \cdot W_1+b_1 \Rightarrow A_1=ReLU(Z_1)\)
+\item
+  Capa 2: \(Z_2=A_1\cdot W_2+b_2 \Rightarrow A_2=ReLU(Z_2)\)
+\item
+  Capa 3: \(Z_3=A_ 2\cdot W_3+b_3 \Rightarrow A_3=Softmax(Z_3)\)
+\end{enumerate}
+
+Ahora el error ahora viajará a través de tres capas por lo que la cadena
+se alarga y se complica. Para llegar a actualizar \(W_1\) (la capa más
+alejada de la salida) la señal de error debe propagarse de la siguiente
+manera: Surge en la salida (\(\delta_3 = A_3 - y\)), luego pasa por
+\(W_3^T\) para llegar a la Capa 2 y por último pasa por \(W_2^T\) para
+llegar a la Capa 1. Por lo que la fórmula de la Delta 1 (\(\delta_1\))
+compelta sería:
+
+\[
+\delta_1 = ((\underbrace{(A_3 - y)}_{\delta_3} \cdot W_3^T \odot \text{ReLU}'(Z_2)) \cdot W_2^T) \odot \text{ReLU}'(Z_1)
+\]
+
+Antes de terminar hablaremos del problema del \emph{overfitting} (en
+español conocido como sobreajuste) que hemos mencionado anteriormente.
+Es el enemigo número uno del aprendizaje automático. En términos
+sencillos, ocurre cuando tu red neuronal tiene tanta memoria que, en
+lugar de aprender a reconocer los patrones de un número, se memoriza las
+imágenes exactas de tu set de entrenamiento. Igual que un estudiante
+que, en lugar de entender las fórmulas de física, se memoriza de memoria
+las respuestas de los 100 problemas del libro. Si en el examen le pones
+el problema 101 (aunque sea igual de fácil), suspenderá porque no sabe
+razonar, solo repetir. Para detectar el overfitting, los ingenieros
+dividen los datos en dos grupos: Entrenamiento (Training) y Prueba
+(Testing/Validation). Los primeros son los datos que ve la red y que usa
+para ajustar los procesos. Los segundos son datos nuevos que la red
+nunca ha visto. Detectar este sobreajuste puede hacerse cuando el error
+en el entrenamiento es casi 0. La red parece casi perfecta con lo que
+conoce. Sin embargo, el error en la prueba con los datos reales es muy
+alto. Para evitar esto podemos aplicar varias técnicas:
+
+\begin{itemize}
+\item
+  \textbf{Early Stopping} (Parada temprana): Dejamos de entrenar en el
+  momento en que el error de Prueba deja de bajar y empieza a subir,
+  aunque el error de Entrenamiento siga bajando.
+\item
+  \textbf{Dropout} (Abandono): Durante el entrenamiento, «apagamos»
+  aleatoriamente algunas neuronas en cada paso (por ejemplo, el 20\%).
+  Esto obliga a la red a no depender de una sola neurona o camino,
+  forzándola a crear representaciones más robustas y generales.
+\item
+  \textbf{Regularización} (L2): Añadimos una penalización al error si
+  los pesos (W) se vuelven demasiado grandes. Pesos gigantes suelen ser
+  señal de que la red está forzando una curva muy compleja para pasar
+  exactamente por todos los puntos.
+\end{itemize}
+
+
+\subsection{Desarrollo del modelo}
+
+Para este desarrollo usaremos PyTorch. Principalmente porque PyTorch
+hace el Backpropagation automáticamente por ti. Tú solo defines el
+\emph{Forward}, y él se encarga de las derivadas de la regla de la
+cadena que tanto nos costó calcular anteriormente. El código está
+completamente desarrollado en \texttt{src/mnist.py}. Necesitamos
+instalar las librerías de Python \texttt{torch}y \texttt{torchvision}
+usando \texttt{pip3}.
+
+\begin{codigo}
+class RedMNIST(nn.Module):
+    def __init__(self):
+        super(RedMNIST, self).__init__()
+        self.flatten = nn.Flatten()
+        self.stack = nn.Sequential(
+            nn.Linear(784, 128),
+            nn.ReLU(),
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Linear(64, 10),
+            nn.LogSoftmax(dim=1)
+        )
+
+    def forward(self, x):
+        x = self.flatten(x)
+        return self.stack(x)
+\end{codigo}
+
+El primer punto importante del código es la preparación de los datos. De
+esto se encarga \texttt{DataLoader}: En lugar de darle las 60,000
+imágenes de golpe, se las damos en \emph{batches} o lotes de 64. El
+conjunto de todas las imágenes están ubicadas en \texttt{trainset}.
+
+Vamos ahora a explicar el código del modelo. En el constructor
+inicialiremos los parámetros (pesos y sesgos). El método
+\texttt{self.flatten} será el que reciba la imagen y la aplane. de ahí
+comenzaremos a aplicar toda el flujo de la red que definimos capa a capa
+el método \texttt{nn.Sequential()}. Este método es realmente el cerebro
+de nuestra red y que hemos explicado en el apartado
+anterior\footnote{Usamos \texttt{nn.LogSoftmax} en lugar de \texttt{nn.Softmax} porque
+trabajar con logaritmos de probabilidades es numéricamente más estable. Evita
+que el ordenador trabaje con números tan pequeños que se conviertan en cero por
+error}. Desde fuera del modelo, el punto de inicio será la llamada al
+método \texttt{forward()}. Cuando llamemos a ese método habrá que
+pasarle un lote de imágenes en el parámetro \texttt{x}. Para terminar
+con el constructor diremos que la función \texttt{nn.Linear()} crea
+automáticamente las matrices de pesos y el vector de bias con las
+dimensiones correctas. Además, inicializa los pesos de forma inteligente
+(usando Xavier/Glorot), así que ya no tienes que preocuparte por si
+empiezan en cero.
+
+\begin{codigo}
+criterion = nn.NLLLoss()
+optimizer = optim.Adam(model.parameters(), lr=0.003)
+
+for epoch in range(2):
+    running_loss = 0.0
+    for images, labels in trainloader:
+        optimizer.zero_grad()             # Reset de gradientes
+        outputs = model(images)           # Forward
+        loss = criterion(outputs, labels) # Error
+        loss.backward()                   # Backpropagation
+        optimizer.step()                  # Ajuste de pesos
+        running_loss += loss.item()
+    print(f"Epoca {epoch+1} - Error: {running_loss/len(trainloader):.4f}")
+\end{codigo}
+
+Vamos ahora a explicar el proceso de entrenamiento. Para acortar la
+prueba únicamente realizaremos dos vueltas pero podríamos incrementarlo
+si quisiéramos. En cada imagen del \texttt{trailoader}, además de
+reiniciar los gradientes, corremos el modelo con la imagen que toque y
+calculamos el error con el método \texttt{criterion()}. Este método
+recibe el vector de salida y el vector asociado a la imagen o
+\texttt{labels} con los resultados que deberíamos haber obtenido. Una
+vez obtenido este error lo propagaremos hacia atrás con
+\texttt{loss.backward()} y ajustaremos los pesos de toda la red usando
+\texttt{optimizer.step()}. En \texttt{running\_loss} iremos acumulado
+los errores de cada lote de 64 imágenes. La idea es que al final de la
+época calculemos la media dividiendo ese \texttt{running\_loss} entre el
+número de lotes que hemos tratado. Como curiosidad técnica diremos que
+el uso de \texttt{loss.item()} provoca que el computador no consuma
+tanta memoria RAM. La variable loss no es un número normal de Python; es
+un Tensor de un solo elemento. Este tensor no solo guarda el valor del
+error (ej. 2.34), sino que también guarda todo el Grafo Computacional
+(el historial de todas las operaciones matemáticas que llevaron a ese
+número) para poder hacer el \emph{Backpropagation}. Si hicieramos un
+\texttt{running\_loss\ +=\ loss} estaríamos guardando el tensor completo
+junto con su historial de cálculos. Al final de la época, tendrías una
+cadena gigante de miles de operaciones guardadas en tu memoria RAM. Tu
+ordenador se quedaría sin memoria rápidamente (Memory Leak). De ahí que
+usemos \texttt{loss.item()}, así extraemos del tensor el valor numérico
+puro (un float), descartando el resto y salvando memoria en cada época.
+
+Por último explicaremos el uso del optimizador Adam. Antes, en redes
+anteriores hemos usado una tasa de aprendizaje fija o \(\eta\). Adam es
+un optimizador con memoria y adaptabilidad. Si el error baja siempre en
+la misma dirección, Adam ``acelera'' (como una bola rodando por una
+colina). A esto le llamamos \emph{Momentum}. Adam también posee una tasa
+adaptativa. Si una neurona recibe gradientes muy bruscos, Adam le baja
+la velocidad individualmente para que no se vuelva loca. Si otra neurona
+casi no se mueve, le sube la velocidad para que aprenda más rápido. Es
+el estándar de la industria porque hace que casi cualquier red converja
+mucho más rápido y sin romperse la cabeza ajustando la tasa de
+aprendizaje manualmente.
+
+
+{\bf Práctica propuesta}:
+
+\begin{enumerate}
+\item
+  Modifica la arquitectura: Añade una tercera capa oculta de 32
+  neuronas.
+
+\item Cambia el Optimizador: Cambia optim.Adam por optim.SGD (Stochastic
+Gradient Descent).
+
+\item
+  Observa: Mira qué pasa con la running\_loss. Verás que con SGD el
+  error baja mucho más lento que con Adam. Ahí entenderás por qué Adam
+  es el rey.
+\end{enumerate}
+
+
+\section{Bibliografía recomendada}
+
+\begin{itemize}
+
+\item
+  Deep Learning. Ian Goodfellow, Yoshua Bengio y Aaron Courville. \emph{Es el
+  libro de referencia absoluto. Ian Goodfellow es el inventor de las GANs. Los
+  capítulos sobre MLP (Multilayer Perceptrons) y Optimización. Te dará el rigor
+  matemático detrás de por qué la Cross-Entropy y Adam funcionan tan bien.}
+  (https://www.deeplearningbook.org/).
+
+\item
+  Neural Networks and Deep Learning. Michael Nielsen.  \emph{Un enfoque muy
+  visual. Es un libro online interactivo que explica el Backpropagation mejor
+  que nadie en el mundo. El capítulo 2 es una obra maestra sobre la matemática
+  del error. Si quieres ver diagramas claros de cómo fluyen los pesos, este es
+  tu sitio.}  (http://neuralnetworksanddeeplearning.com/).
+
+\item
+  Hands-On Machine Learning with Scikit-Learn, Keras, and TensorFlow. Aurélien
+  Géron. \emph{Es el manual de ingeniería más vendido. Aunque el título menciona
+  TensorFlow, los conceptos de arquitectura y pre-procesamiento de datos (como
+  el MNIST) son universales.  Fundamentales, las secciones sobre Regulación,
+  Batch Normalization y cómo evitar el Overfitting.}
+  
+\item
+  Deep Learning with PyTorch. Eli Stevens, Luca Antiga y Thomas Viehmann.
+\end{itemize}
+
+
+
+
+
+
+
+
+
+
+
+
 \end{document}
