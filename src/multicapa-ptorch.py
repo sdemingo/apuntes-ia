@@ -35,8 +35,8 @@ for epoch in range(epochs):
     loss = criterion (outputs, y)      # Error
 
     optimizer.zero_grad()
-    loss.backward()                    # Backpropagation
-    optimizer.step() 
+    loss.backward()         # Backpropagation
+    optimizer.step()        # Ajuste pesos automático (de eso se encarga el optimizador)
 
     if (epoch + 1) % 500 == 0:
         print(f"Época {epoch+1}/{epochs} - Error: {loss.item():.4f}")

@@ -29,3 +29,4 @@ sabe si el píxel 1 está al lado del píxel 2 o del píxel 28. Simplemente ve u
 lista de números. Piensa en esto: ¿Cómo podrías tú reconocer una cara si te
 dieran todos los píxeles de una foto mezclados en una bolsa? Sería
 imposible. Las CNN vienen a resolver precisamente eso.
+
