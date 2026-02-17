@@ -1,0 +1,252 @@
+\documentclass[a4paper,11pt]{article}
+\usepackage[margin=2cm]{geometry}   %% márgenes
+\usepackage [utf8]{inputenc}  % Uso de utf8
+\usepackage [spanish]{babel}  % Españolización de los entornos
+\usepackage [pdftex]{graphicx}        % Uso avanzado de imágenes
+\usepackage{xspace}           % Uso inteligente de los espacios en entornos definidos por mi
+\usepackage{fancyhdr}         % Estilos de página mejorados
+\usepackage{listings}
+\usepackage{upquote}  %% para meter acentos libres en los listings (`)
+\usepackage{amsmath}  %% para meter texto en formulas con \text
+\usepackage{setspace}  %% Para tunear el espaciado del índice
+
+\usepackage{tikz}
+\usetikzlibrary{positioning,babel}
+
+\setlength{\parskip}{0.5em}
+
+%% Configuración de las áreas de código usadas con "codigo"
+\lstset{frame=tblr,
+  aboveskip=4mm,
+  belowskip=4mm,
+  showstringspaces=false,
+  columns=flexible,
+  basicstyle={\small\ttfamily},
+  numbers=none,
+  numberstyle=\tiny,
+  breaklines=true,
+  breakatwhitespace=true,
+  showtabs=true,	
+  tabsize=4,
+  literate={á}{{\'a}}1 {ñ}{{\~n}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
+}
+\lstnewenvironment{codigo}
+  {\renewcommand\lstlistingname{codigo}
+   \noindent\minipage{\linewidth}}
+  {\endminipage}
+
+
+% Redefino equation para meterle espacios antes y después
+\renewenvironment{equation}{\begin{equation*}}{\end{equation*}}
+\let\oldequation\equation
+\let\endoldequation\endequation
+\renewenvironment{equation}
+  {\vspace{0.5em}\oldequation}
+  {\endoldequation\vspace{0.5em}}
+
+
+\begin{document}
+
+
+\section*{Práctica: Ecuaciones de segundo grado}
+
+En esta práctica trataremos de crear un modelo para calcular ecuaciones
+de segundo grado. Tras crearlo lo analizaremos y realizaremos
+modificaciones. Para las Capas ocultas necesitamos profundidad. Usaremos
+dos capas de 16 neuronas de ancho. Más adelante probaremos a modificar
+este diseño y analizaremos los resultados. Por ahora la estructura será:
+
+
+\begin{center}
+\begin{tikzpicture}[
+    % Estilos de los elementos
+    neuron/.style={circle, draw, fill=white, minimum size=15pt, inner sep=0pt},
+    input/.style={neuron, fill=blue!20},
+    hidden/.style={neuron, fill=green!20},
+    output/.style={neuron, fill=red!20},
+    label/.style={font=\small\bfseries}
+]
+
+% --- CAPA DE ENTRADA (3 neuronas) ---
+%\foreach \i in {1,2,3}
+\foreach \i / \txt in {1/a, 2/b, 3/c}
+    \node[input] (I-\i) at (0, -\i-1) {$\txt$};  % <--- Aquí ponemos la variable \txt
+\node[label, above=0.2cm of I-1] {Entrada};
+
+% --- CAPA OCULTA 1 (16 neuronas - representadas con elipsis) ---
+\foreach \i in {1,2, 15, 16} % Dibujamos solo las extremas
+    \node[hidden] (H1-\i) at (2.5, -\i*0.4 - 0.5) {};
+\node at (2.5, -2.8) {$\vdots$}; 
+\node at (2.5, -3.8) {16}; 
+\node at (2.5, -4.8) {$\vdots$};
+\node[label, above=0.2cm of H1-1] {Oculta 1};
+
+% --- CAPA OCULTA 2 (16 neuronas - representadas con elipsis) ---
+\foreach \i in {1,2, 15, 16}
+    \node[hidden] (H2-\i) at (5, -\i*0.4 - 0.5) {};
+\node at (5, -2.8) {$\vdots$}; 
+\node at (5, -3.8) {16}; 
+\node at (5, -4.8) {$\vdots$};
+\node[label, above=0.2cm of H2-1] {Oculta 2};
+
+% --- CAPA DE SALIDA (2 neuronas) ---
+\foreach \i in {1,2}
+    \node[output] (O-\i) at (7.5, -\i-1.5) {$x_\i$};
+\node[label, above=0.2cm of O-1] {Salida};
+
+% --- CONEXIONES ---
+% Entrada -> H1
+\foreach \i in {1,2,3}
+    \foreach \j in {1,2,15,16}
+        \draw[->, gray!50] (I-\i) -- (H1-\j);
+
+% H1 -> H2
+\foreach \i in {1,2,15,16}
+    \foreach \j in {1,2,15,16}
+        \draw[->, gray!50] (H1-\i) -- (H2-\j);
+
+% H2 -> Salida
+\foreach \i in {1,2,15,16}
+    \foreach \j in {1,2}
+        \draw[->, gray!50] (H2-\i) -- (O-\j);
+
+\end{tikzpicture}
+\end{center}
+
+
+La generación de los datos es el primer desafío. Si generamos
+\(a\),\(b\),\(c\) al azar, muchas ecuaciones tendrán soluciones
+complejas \((b^2 - 4ac < 0)\). PyTorch estándar no maneja números
+complejos de forma nativa para entrenamiento simple. Para evitar este
+problema lo haremos al reves, fijaremos las soluciones de la ecuación
+\(x_1\) y \(x_2\) y calcularemos \(a\),\(b\),\(c\) a partir de estas.
+Para ello podemos usar las fórmulas de Vieta. De donde extraemos:
+
+\[
+a = 1 \hspace{1cm} b = -(x_1 + x_2) \hspace{1cm}  c = x_1 \cdot x_2
+\]
+
+También acotaremos el rango de nuestras salidas (en este caso entre -10
+y 10) y por último ordenaremos estas. Si para la entrada (1,-5,6) a
+veces le dices que la respuesta es (2,3) y otras veces (3,2), la red se
+confundirá y el error (Loss) nunca bajará de cierto punto. Para evitar
+esto siempre ordenamos las salidas (\(y\)). Por ejemplo, haz que la
+salida 1 sea siempre la raíz más pequeña y la salida 2 la más grande.
+Esto facilita enormemente el aprendizaje porque la red detecta un patrón
+claro.
+
+\begin{codigo}
+def generar_datos(n_muestras=500):
+    x_reales = np.random.uniform(-10, 10, (n_muestras, 2))
+    inputs = []
+    targets = []
+    for i in range(n_muestras):
+        x1, x2 = x_reales[i]
+        a = 1.0
+        b = -(x1 + x2)
+        c = x1 * x2
+        inputs.append([a, b, c])
+        targets.append(sorted([x1, x2]))
+
+    return torch.tensor(inputs, dtype=torch.float32), 
+            torch.tensor(targets, dtype=torch.float32)
+\end{codigo}
+
+En relación al cálculo de error, como es un problema de predecir valores
+numéricos exactos (regresión), la función de pérdida ideal es el MSELoss
+(Mean Squared Error). Tenemos que tener cuidado con la tasa de
+aprendizaje, sobre todo si empezamos con un 0.5 como en casos
+anteriores. Un 0.5 es extremadamente alto para este tipo de problema.
+Imagina que el optimizador está intentando bajar a un pozo (el mínimo
+error), pero da saltos tan gigantes que se pasa de largo y termina en la
+montaña de enfrente. Terminaremos obteniendo infinitos o \texttt{nan}
+como resultado del error. Por lo tanto, la tasa de aprendizaje debe ser
+baja de inicio, por ahora la hemos dejado en 0,01. Aquí mostramos el
+algoritmo inicial y mostramos la salida ofrecida.
+
+\begin{codigo}
+import torch
+import numpy as np
+import torch.nn as nn
+import torch.optim as optim
+
+class RedEcuaciones(nn.Module):
+    def __init__(self):
+        super(RedEcuaciones, self).__init__()
+
+        self.hidden1 = nn.Linear(3, 16)     # Capa de entrada (3) a primera capa oculta (16)
+        self.hidden2 = nn.Linear(16, 16)    # Segunda capa oculta (16 a 16)
+        self.output = nn.Linear(16, 2)      # Capa de salida (16 a 2 soluciones)
+        self.relu = nn.ReLU()               # Func. de activacion
+
+    def forward(self, x):
+        x = self.relu(self.hidden1(x))
+        x = self.relu(self.hidden2(x))
+        x = self.output(x)
+        return x
+
+
+X, y = generar_datos(500)
+
+model = RedEcuaciones()
+criterion = nn.MSELoss()
+optimizer = optim.Adam(model.parameters(), lr=0.01)
+
+epochs=8000
+print("Entrenando ...")
+
+for epoch in range(epochs):
+    outputs = model(X)
+    loss = criterion (outputs, y)      # Error
+
+    optimizer.zero_grad()
+    loss.backward()         # Backpropagation
+    optimizer.step()        # Ajuste pesos automatico (de eso se encarga el optimizador)
+
+    if (epoch + 1) % 500 == 0:
+        print(f"Epoca {epoch+1}/{epochs} - Error: {loss.item():.4f}")
+\end{codigo}
+
+
+\begin{codigo}
+Epoca 500/8000 - Error: 0.0718
+Epoca 1000/8000 - Error: 0.0477
+....
+Epoca 8000/8000 - Error: 0.0172
+\end{codigo}
+
+El error nunca bajará al 0 como lo haría un cálculo matemático La fórmula de la
+ecuación de segundo grado tiene una raíz cuadrada $\sqrt{(b²-4ac)}$. Las
+funciones de activación como ReLU son "pedazos" de líneas rectas. Imagina que
+intentas dibujar un círculo perfecto usando solo reglas cortas. Por más reglas
+que uses, si te acercas mucho, verás pequeños ángulos. Pues eso mismo está
+haciendo la red, aproximando una curva compleja con pequeños segmentos lineales.
+
+En teoria cualquier red neuronal pude aproximar cualquier función pero no es
+fácil. Con 16 neuronas, tienes un número limitado de «reglas» para dibujar esa
+curva. Si subieras a 64 o 128 neuronas, verías que el error baja a 0.0050, pero
+el modelo sería más pesado. Además de todo esto tenemos un sesgo de los
+datos. Si tus valores de x van de -10 a 10, pero la mayoría de tus ejemplos en
+el dataset de 500 muestras están cerca del 0, la red será experta en números
+pequeños y torpe en los grandes. A esto se le llama distribución de los datos y
+en este caso está muy sesgada para ese marco de resultados de $x_1$ y $x_2$.
+
+Hemos implementado tan solo uno de los cambios mencionados arriba, incrementando
+la anchura de las capas ocultas de 16 neuronas a 128 y los resultados han sido
+una disminución del error considerable. El tiempo de entrenamiento para la misma
+cantidad de muestras ha pasado de 5 segundos a 23 segundos, sin
+embargo\footnote{Probado en Google Colab}.
+
+
+
+\begin{codigo}
+Entrenando ...
+Epoca 500/8000 - Error: 0.0483
+Epoca 1000/8000 - Error: 0.0285
+....
+....
+Epoca 7500/8000 - Error: 0.0065
+Epoca 8000/8000 - Error: 0.0045
+\end{codigo}
+
+\end{document}

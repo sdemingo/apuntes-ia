@@ -1170,19 +1170,17 @@ aprendizaje manualmente.
 
 \begin{enumerate}
 \item Realiza una implementación de la Red XOR de la sección anterior pero
-  usando PyTorch: (Hecho en \texttt{src/multicapa-ptorch.py}
+  usando PyTorch. (Hecho en \texttt{src/multicapa-ptorch.py}
+
+\item Realiza una implementación de una Red multicapa con PyTorch que aprenda a
+  resolver ecuaciones de segundo grado. (Hecho en
+  \texttt{src/ecuaciones-ptorch.py} y documentado en \texttt{pdf/prac-01-ecuaciones.pdf}).
 
 \item
-  Modifica la arquitectura: Añade una tercera capa oculta de 32
-  neuronas.
+  Modifica la arquitectura presentada en este apartado añadiendo una tercera
+  capa oculta de 32 neuronas, cambiando el analizador a uno de tipo estocástico
+  (\texttt{optim.SGD}) y observa que ocurre con \texttt{running\_loss}.
 
-\item Cambia el Optimizador: Cambia optim.Adam por optim.SGD (Stochastic
-Gradient Descent).
-
-\item
-  Observa: Mira qué pasa con la running\_loss. Verás que con SGD el
-  error baja mucho más lento que con Adam. Ahí entenderás por qué Adam
-  es el rey.
 \end{enumerate}
 
 
