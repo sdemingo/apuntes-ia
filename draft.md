@@ -91,8 +91,8 @@ puede detectar líneas horizontales, el canal 2 detecta esquinas, etc
 
 Pero antes de llegar a la salida (los 10 números del MNIST), tenemos que volver
 al mundo que ya conoces. Si al final de las capas de convolución nos queda un
-bloque de 32×13×13, lo «aplanamos» multiplicando todas sus dimensiones:
-$32×13×13=5408 neuronas$. Esas 5408 neuronas entrarán en una capa `nn.Linear`
+bloque de $32 \times 13 \times 13$, lo «aplanamos» multiplicando todas sus dimensiones:
+$32 \times 13 \times 13=5408$ neuronas. Esas 5408 neuronas entrarán en una capa `nn.Linear`
 clásica.
 
 
@@ -155,3 +155,77 @@ sola neurona de esa segunda capa puede estar recibiendo información que
 originalmente cubría un área de 10×10 o más. Por eso se dice que esta segunda
 capa tiene «perspectiva». Puede entender la geometría del número, no solo los
 píxeles sueltos. A esto se le llama también campo receptivo.
+
+
+## Funcionamiento de una capa convolucional
+
+Vamos a describir brevemente la maquinaria dentro de una de estas capas
+representadas por la función `Conv2d()`. Imagina que tienes la imagen de entrada
+y sobre ella colocas una rejilla de 3×3 (el filtro). Cada celda de esa rejilla
+tiene un peso (W). Entonces ocurre una operación matemática llamada convolución
+(técnicamente, una correlación cruzada). La convolución es una operación
+matemática fundamental que combina dos funciones (o señales), $f$ y $h$ para
+producir una tercera que describe cómo una modifica a la otra. El proceso es más
+o menos el siguiente:
+
+1. El filtro se sitúa sobre los primeros 9 píxeles.
+2. Multiplica cada píxel por su peso correspondiente en el filtro.
+3. Suma los 9 resultados y añade el *bias*.
+4. Ese resultado único se convierte en un solo píxel de la nueva imagen (el mapa de características).
+
+![Ejemplo de aplicación de un filtro](./img/conv-filter.png){width=10cm}
+
+La clave es que no hay un diseño previo del filtro, sino que es la red la que lo
+aprende. Si un filtro tiene pesos negativos en la columna izquierda y positivos
+en la derecha, cuando pase sobre una zona donde el color cambia de negro a
+blanco, la suma dará un número muy alto. Acaba de encontrar un borde
+vertical. Veamos un ejemplo para entender esto último. Tenemos un filtro de $3
+\times 3$. Vamos a darle esos valores que mencioné: negativos a la izquierda y
+positivos a la derecha.
+
+$$
+\text{Filtro} = \begin{bmatrix} -1 & 0 & 1 \\ -1 & 0 & 1 \\
+-1 & 0 & 1 \end{bmatrix}
+$$
+
+Imagina que el filtro pasa por una zona de la imagen donde todos los píxeles son
+blancos (valor 255). Multiplicamos cada píxel por su peso y observamos que la
+suma total es $-765 + 0 + 765 = \mathbf{0}$. Este valor se intepreta como una
+ausencia de cambios. No hay bordes.
+
+- Columna izquierda: $255 \times (-1) + 255 \times (-1) + 255 \times (-1) =
+  -765$
+- Columna central: $255 \times 0 + 255 \times 0 + 255 \times 0 = 0$
+- Columna derecha: $255 \times 1 + 255 \times 1 + 255 \times 1 = 765$
+
+Ahora imagina que el filtro está justo encima de un borde. Los píxeles de la
+izquierda son negros (0) y los de la derecha son blancos (255). Hacemos la misma
+operación que antes y vemos que la suma total es mucho mayor: $0 + 0 + 765 =
+\mathbf{765}$. Este valor tan alto lo interpretamos como que la red acaba de
+detectar un contraste fuerte entre la izquierda y la derecha. En el mapa de
+características resultante, ese píxel brillará con mucha fuerza.
+
+$$
+\text{Zona de la imagen} = \begin{bmatrix} 0 & 255 & 255 \\ 0 & 255 & 255 \\ 0 & 255 & 255 \end{bmatrix}
+$$
+
+- Columna izquierda (negra): $0 \times (-1) + 0 \times (-1) + 0 \times (-1) = 0$
+- Columna central: $255 \times 0 + 255 \times 0 + 255 \times 0 = 0$
+- Columna derecha (blanca): $255 \times 1 + 255 \times 1 + 255 \times 1 = 765$
+
+El filtro que hemos puesto de ejemplo detecta bordes que pasan de negro a
+blanco. Si el filtro fuera al revés (positivos a la izquierda y negativos a la
+derecha), detectaría bordes que pasan de blanco a negro. Si los pesos estuvieran
+en las filas superiores e inferiores, detectaría bordes horizontales. Si los
+pesos estuvieran solo en las esquinas, detectaría diagonales. Antaño esos
+filtros se escribían a mano. Hoy esos filtros se inicializan al azar para que
+luego la red calcule los errores tras el entrenamiento y realice el
+*backpropagation* visto anteriormente. Poco a poco, la red ajusta esos pesos
+poco a poco hasta que, mágicamente, los 32 filtros se han convertido en
+detectores perfectos de bordes horizontales, verticales, oblicuos, etc. La
+segunda capa hace lo mismo, pero en lugar de multiplicar píxeles, multiplica los
+«brillos» (activaciones) de la primera capa.  Si el Filtro de Bordes Verticales
+brilló y el Filtro de Bordes Horizontales también brilló en el mismo sitio, un
+filtro de la segunda capa diseñado para sumar ambos detectará una esquina.
+
+
