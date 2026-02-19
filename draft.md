@@ -85,6 +85,7 @@ tensores usados:
    
 3. **Tras el Pooling** de 2x2: Obtenemos [32x13x13]
 
+
 Aunque ahora tenemos más datos (32 mapas en lugar de 1), estos datos están
 jerarquizados. Cada uno de los 32 canales se especializa en algo: el canal 1
 puede detectar líneas horizontales, el canal 2 detecta esquinas, etc
@@ -227,5 +228,140 @@ segunda capa hace lo mismo, pero en lugar de multiplicar píxeles, multiplica lo
 «brillos» (activaciones) de la primera capa.  Si el Filtro de Bordes Verticales
 brilló y el Filtro de Bordes Horizontales también brilló en el mismo sitio, un
 filtro de la segunda capa diseñado para sumar ambos detectará una esquina.
+
+Pero queda un asunto pendiente. Si tenemos 32 filtros, ¿qué impide que los 32
+acaben siendo exactamente iguales si todos buscan minimizar el mismo error? La
+respuesta es una combinación de caos inicial, especialización y matemáticas de
+alta dimensión. Cuando creas la red, PyTorch no pone los filtros a cero. Si
+todos empezaran en cero, todos recibirían el mismo gradiente y, efectivamente,
+los 32 serían idénticos para siempre. En su lugar, los pesos se inicializan con
+valores aleatorios muy pequeños. Así cada filtro empieza con una ligera
+«tendencia» a buscar elementos concretos. Por ejemplo, el Filtro \#1 empieza con
+una ligera tendencia a favor de los píxeles de arriba. El Filtro \#2 empieza con
+una tendencia hacia los de la derecha y así sucesivamente. Como sus puntos de
+partida son diferentes, cada filtro empieza a "caer" por una ladera distinta de
+la montaña del error. Es muy difícil que dos filtros que empezaron en lugares
+distintos acaben convergiendo exactamente al mismo diseño.  Además, cuando el
+sistema intenta mejorar aún más, el algoritmo de optimización (el gradiente) «se
+da cuenta» de que ya no gana mucho haciendo que el Filtro #2 también detecte
+bordes verticales. Para reducir el error que queda (el error que el Filtro #1 no
+puede solucionar), el Filtro #2 se ve empujado a buscar rasgos que el Filtro
+#1 está ignorando, como bordes horizontales o curvas.
+
+Matemáticamente, el espacio de posibles filtros es inmenso. En un filtro de 3×3
+con valores decimales, hay infinitas combinaciones. En redes muy profundas, se
+utilizan técnicas como la Regularización, que penaliza a la red si los pesos de
+los filtros son demasiado parecidos entre sí, forzándolos a ser «ortogonales»
+(matemáticamente independientes). Aunque en nuestra CNN básica para MNIST, el
+simple hecho de empezar con valores aleatorios y tener un objetivo complejo
+suele ser suficiente para que cada filtro encuentre su propio nicho
+ecológico. Aunque antes de terminar con esto hemos de decir que a veces
+ocurre. En redes gigantescas con miles de filtros, es común que algunos se
+parezcan. Esto no es necesariamente malo; a veces la red usa esa redundancia
+como un sistema de seguridad.
+
+
+
+
+## El paso de la convolución a la clasificación
+
+Vamos a explicar brevemente como pasamos la información de las capas de
+convolución a las capas lineales o lo que es lo mismo, el paso del «Mapa de
+Características» al «Vector de Clasificación». Mientras que las capas
+convolucionales mantienen la estructura espacial (una imagen de 28×28 se
+convierte en 32 imágenes de 13×13, etc.). Pero las capas finales (Linear) son
+"ciegas" a la geometría; solo aceptan una lista larga de números. Para entender
+bien este apartado resumimos el viaje de los datos y sus transformaciones a
+través de las dos capas convolucionales.
+
+0. Partimos de una imagen original como un cuadrado de 28x28 píxeles.
+
+1. Primera parada: Conv1 (Filtro 3x3). Como vimos, al pasar un filtro de 3x3 sin
+   "padding" (sin añadir bordes extra), perdemos un píxel por cada lado
+   ($28-2=26$). Ahora tenemos mapas de 26x26.
+
+2. Segunda parada: MaxPool1 (2x2). Ya dijimos antes que el Pooling es un
+   resumidor. Toma bloques de 2x2 y los convierte en 1 solo píxel (el más
+   brillante). Por tanto, divide el tamaño por 2 ($26/2=13$. Ahora tendremos
+   mapas son de 13x13.
+
+3. Tercera parada: Conv2 (Filtro 3x3). Volvemos a pasar un filtro de 3x3 sobre
+   esos mapas de 13x13. Volvemos a perder un píxel por cada borde
+   ($13-2=11$). Ahora tenemos mapas de 11x11.
+
+4. Cuarta parada: MaxPool2 (2x2). Volvemos a dividir por 2. Como 11 es impar,
+   PyTorch por defecto redondea hacia abajo ($11/2=5.5 \rightarrow 5$). En este punto por
+   tanto, los mapas de características ahora miden 5x5.
+
+Después de todo ese proceso, lo que le queda a la red es una versión minúscula
+de la imagen original. Pero no es una imagen borrosa; es una destilación de
+conceptos. Un píxel arriba a la izquierda podría significar: «Aquí hay una curva
+cerrada». Un píxel en el centro podría significar: »Aquí hay un cruce de
+líneas». Y como en la última capa convolucional pedimos 64 filtros, lo que
+tenemos al final es 64 de esos cuadritos de 5x5. Para poder entrar en la capa
+Linear, necesitamos una fila de neuronas. Así que estiramos (Flatten) todos
+esos cuadritos y para ello usamos la instrucción: `x = x.view(-1, 64 * 5 * 5)`.  Con
+esta instrucción lo que estamos haciendo es tomar ese «ladrillo» de datos de la
+última capa de convolución y estirarlo. Donde 64 es el número de filtros
+(conceptos complejos detectados) y 5x5 es el tamaño de la imagen resumida tras
+pasar por las convoluciones y los poolings.
+
+Si alguna vez cambias el tamaño del filtro (por ejemplo a 5x5) o añades más
+capas, ese 5*5*64 cambiará. Si no actualizas el primer número de tu `nn.Linear`,
+el programa fallará porque la puerta de entrada a la capa final no coincidirá
+con la cantidad de datos que vienen de las convoluciones.
+
+
+
+
+## El fenóneno del dropout
+
+El Dropout es una de las técnicas más curiosas y efectivas en el Deep
+Learning. Si las convoluciones son el "cerebro" de la red, el Dropout es su
+entrenamiento militar. Imagina que tienes un equipo de 10 especialistas
+trabajando en un proyecto. Si uno de ellos es muy dominante, el resto se vuelve
+perezoso y deja de aprender, confiando siempre en lo que diga el líder. Si el
+líder se equivoca, todo el equipo falla.
+
+El Dropout consiste en apagar o poner a cero un porcentaje aleatorio de neuronas
+en cada paso del entrenamiento. Esto obliga a la red a no depender de una sola
+neurona o de un solo filtro para reconocer un número. Esto provoca que la red
+desarrolle redundancia. Si apagas la neurona que detecta el «palito vertical del
+4», la red se ve forzada a aprender otras formas de identificar el 4. Esto evita
+el *Overfitting* (que la red se memorice los datos de entrenamiento pero falle con
+imágenes nuevas).
+
+
+
+### Conclusiones
+
+Tras el entrenamiento y la prueba el colab de Google, el código mostrado en
+`src/mnist-cnn.py` ha tardado 5 minutos en ejecutarse y ha mostrado los
+siguientes errores medios para cada época:
+
+```
+Epoca 1 - Error medio: 0.2344
+Epoca 2 - Error medio: 0.0833
+Epoca 3 - Error medio: 0.0632
+Epoca 4 - Error medio: 0.0524
+Epoca 5 - Error medio: 0.0458
+```
+
+Frente a la antigua red MNSIT que no usaba CNN se ve de forma asombrosa que con
+muchísimas menos épocas de entrenamiento, 5 en este caso frente a las 5000
+anteriores llegamos a un error muy bajo igualmente. Mientras que la red lineal
+sufría para llegar al 90%, una CNN básica como la nuestra superará el 98% o 99%
+casi sin esfuerzo, porque «entiende» la estructura del número. Cuando la gente
+habla de Deep Learning, se refiere precisamente a esto. **Al ir añadiendo capas,
+estamos permitiendo que la red cree conceptos cada vez más abstractos**.
+
+
+
+
+
+
+
+
+
 
 
