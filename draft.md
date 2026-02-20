@@ -112,3 +112,38 @@ def palabra_a_objetivo(palabra):
     return torch.LongTensor(indices)
 ```
 
+El tensor resultante será algo parecido al mostrado en la figura pero
+almacenando los índices de cada letra en lugar de la propia letra en si
+mima. Hay otros cambios, además de la modelización de los datos de entrada, con
+respecto a las CNN anteriores. Por ejemplo, antes en las CNN el error se
+calculaba al final de la imagen. Ahora calcularemos el error en cada letra. Si
+la red predice E en lugar de A en M-A-D-R-I-D, ya tenemos un error que propagar
+hacia atrás (Backpropagation Through Time).
+
+
+![Visualización del tensor de la palabra «HOLA»](./img/tensor-palabras.png){width=5cm}
+
+
+Otra diferencia respecto a las CNN es que donde antes simplemente lanzabas el
+modelo con el dataset de imágenes, ahora hay que inicializar la memoria en cada
+palabra nueva. Si la red tiene 128 neuronas ocultas, su memoria inicial será un
+vector de ceros de tamaño 128. A medida que lee cada letra, ese vector de
+ceros se irá llenando con la esencia de lo que ha leído.
+
+No hemos de confundir la profundidad de la red con la cantidad de pasos que
+hemos de dar. O dicho de otra manera, la profundidad en capas de la red no
+depende de la longitud de las palabras que queremos predecir. Cuando procesas
+una palabra como ZARAGOZA (8 letras), la RNN se «desenrolla» 8 veces, usando una
+y otra vez la misma capa. Cada capa, eso sí, puede especializarse en estructuras
+complejas que irá pasando a la siguiente (igual que hacíamos con los bordes y
+las esquinas antes). Podemos tener una capa que aprenda a reconcer combinaciones
+de letras como CH o LL y otra capa que aprenda a reconocer raíces de palabras o
+sufijos (-ONA, o -ID). Normalmente, con 1, 2 o 3 capas es más que suficiente
+para problemas de texto sencillo. Si pusiéramos 50 capas (una por cada letra), la
+red sería imposible de entrenar por el problema del gradiente que comentamos
+antes.
+
+Lo que define el tamaño de la palabra a procesar es el **tamaño de la memoria**,
+también llamado *Hidden Size*. Cuanto más compleja sea la estructura que quieres
+aprender (no más larga, sino más compleja), más grande debe ser ese *Hidden
+Size*.
