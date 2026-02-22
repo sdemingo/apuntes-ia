@@ -147,3 +147,109 @@ Lo que define el tamaño de la palabra a procesar es el **tamaño de la memoria*
 también llamado *Hidden Size*. Cuanto más compleja sea la estructura que quieres
 aprender (no más larga, sino más compleja), más grande debe ser ese *Hidden
 Size*.
+
+
+## Programando una RNN
+
+En el ejemplo usamos un *Hidden Size* de 128, o lo que es lo mismo, 128 neuronas
+de memoria (ancho de nuestra red). Son estas neuronas las que guardan el
+recuerdo de lo leído. En nuestro caso, cuando la red lee la letra «M», escribe
+algo en esas 128 libretas. Cuando pasa a la siguiente letra («A»), lee lo que
+había en las 128 libretas y escribe encima la nueva información. Si usáramos un
+*Hidden Size* de 2, la red solo tendría dos anotaciones para recordar qué ciudad
+está escribiendo y, por tanto, es casi seguro que se olvidara de si empezó por
+«M» o por «B» a la tercera letra. Si usáramos 1024, tendrá una memoria épica,
+pero tardará mucho más en entrenar. En PyTorch, la capa `nn.RNN` devuelve dos
+cosas: la salida de cada paso y el recuerdo final. Nosotros usaremos ese
+recuerdo para decidir cuál es la siguiente letra. Esta capa es un contenedor que
+automatiza el bucle, pero tú decides si lo usas para una letra o para toda la
+palabra. Internamente esta capa tiene dos juegos de pesos:
+
+* $W_{ih}$ (Input-to-Hidden): Lo que aprende de la letra que entra ahora.
+
+* $W_{hh}$ (Hidden-to-Hidden): Lo que aprende de lo que ya había en la memoria.
+
+De esta forma en cada paso de cada letra la capa hará:
+
+$$
+\text{Nuevo Hidden} = \tanh(W_{ih} \cdot \text{Letra} + W_{hh} \cdot \text{Hidden Anterior})
+$$
+
+
+
+```
+import torch.nn as nn
+
+class GeneradorCiudades(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super(GeneradorCiudades, self).__init__()
+        self.hidden_size = hidden_size
+        self.rnn = nn.RNN(input_size, hidden_size, batch_first=True)
+        self.fc = nn.Linear(hidden_size, output_size)
+    
+    def forward(self, x, hidden):
+        out, hidden = self.rnn(x, hidden)
+        out = self.fc(out)
+        return out, hidden
+
+    def init_hidden(self):
+        return torch.zeros(1, 1, self.hidden_size)
+
+
+modelo = GeneradorCiudades(n_letras, 128, n_letras)
+```
+
+
+El entrenamiento es algo más dinámico que el desarrollado anteriormente. Para
+cada ciudad, reseteamos la memoria, le metemos las letras una a una y castigamos
+a la red si no adivina la siguiente. En este código se observa que usamos
+`nn.RNN` dentro de un bucle en `for i in range(tensor_x....)`. En este caso
+estamos usando `nn.RNN` «a mano». Esto quiere decir que le damos la letra «M»,
+por ejemplo, y al estar la memoria vacía nos retorna una salida con una «M» en
+la memoria. Luego le daremos la «A» con el recuerdo de la memoria con la «M» y
+nos dará la salida con una memoria de recuerdo con «MA», y así
+sucesivamente. Realmente podríamos hacer lo mismo prescindiendo de ese bucle
+`for`. PyTorch permite pasarle la palabra entera («MADRID») de golpe a
+`nn.RNN`. El módulo detectará que hay 6 letras y ejecutará el bucle internamente
+6 veces, devolviéndote todas las salidas y la memoria final. Se ha hecho usando
+el bucle simplemente para mejorar la comprensión del *Hidden Size* y de como
+este fluye de letra a letra.
+
+>La capa RNN funciona como si fuera un único empleado de una oficina. La entrada
+>`x` sería el papel que le dejas al empleado sobre la mesa, el estado oculto o
+>`hidden` es lo que el empleado mantiene en su cabeza al llegar por la
+>mañana. La pasada o `forward` representa el empleado leyendo el papel, usando
+>lo que tiene en su memoria y produciendo un informe de salida a la vez que
+>actualiza lo que sabe para el día sigiente. El bucle for del que hemos hablado
+>antes representa el paso de los días (o las letras).
+
+
+```
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(modelo.parameters(), lr=0.001)
+
+# Entrenamiento simple
+for epoch in range(1000):
+    total_loss = 0
+    for ciudad in ciudades:
+        # 1. Preparar datos y resetear memoria
+        tensor_x = palabra_a_tensor(ciudad)          # Ej: "MADRID"
+        tensor_y = palabra_a_objetivo(ciudad)        # Ej: "ADRID."
+        hidden = modelo.init_hidden()
+        
+        optimizer.zero_grad()
+        loss = 0
+        
+        # 2. Bucle temporal (aqui es donde la red recorre la palabra)
+        for i in range(tensor_x.size(0)):
+            output, hidden = modelo(tensor_x[i].unsqueeze(0), hidden)
+            loss += criterion(output.view(1, -1), tensor_y[i].unsqueeze(0))
+        
+        # 3. Optimizacion tras procesar TODA la palabra
+        loss.backward()
+        optimizer.step()
+        total_loss += loss.item()
+    
+    if (epoch + 1) % 100 == 0:
+        print(f"Epoca {epoch+1}/1000 - Error: {total_loss/len(ciudades):.4f}")
+```
