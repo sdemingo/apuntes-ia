@@ -65,11 +65,13 @@ Memory), que tienen una estructura especial para decidir qué recuerdos guardar 
 cuáles borrar.
 
 
-
 Para este ejemplo usaremos nombres de ciudades que vamos a intentar
 predecir. Vamos a construir para ello un diccionario de caracteres. Esto es
 esencial porque la red no entiende de letras, solo de posiciones en un
-vector. Este un proceso llamado mapeado o *mapping*.
+vector. Este un proceso llamado mapeado o *mapping*. Todo el código que se
+muestra en esta sección está situado en `src/rnn.py` y ha sido probado con
+Google Colab.
+
 
 ```
 import torch
@@ -127,21 +129,19 @@ hacia atrás (Backpropagation Through Time).
 Otra diferencia respecto a las CNN es que donde antes simplemente lanzabas el
 modelo con el dataset de imágenes, ahora hay que inicializar la memoria en cada
 palabra nueva. Si la red tiene 128 neuronas ocultas, su memoria inicial será un
-vector de ceros de tamaño 128. A medida que lee cada letra, ese vector de
-ceros se irá llenando con la esencia de lo que ha leído.
-
-No hemos de confundir la profundidad de la red con la cantidad de pasos que
-hemos de dar. O dicho de otra manera, la profundidad en capas de la red no
-depende de la longitud de las palabras que queremos predecir. Cuando procesas
-una palabra como ZARAGOZA (8 letras), la RNN se «desenrolla» 8 veces, usando una
-y otra vez la misma capa. Cada capa, eso sí, puede especializarse en estructuras
-complejas que irá pasando a la siguiente (igual que hacíamos con los bordes y
-las esquinas antes). Podemos tener una capa que aprenda a reconcer combinaciones
-de letras como CH o LL y otra capa que aprenda a reconocer raíces de palabras o
-sufijos (-ONA, o -ID). Normalmente, con 1, 2 o 3 capas es más que suficiente
-para problemas de texto sencillo. Si pusiéramos 50 capas (una por cada letra), la
-red sería imposible de entrenar por el problema del gradiente que comentamos
-antes.
+vector de ceros de tamaño 128. A medida que lee cada letra, ese vector de ceros
+se irá llenando con la esencia de lo que ha leído. **No hemos de confundir la
+profundidad de la red con la cantidad de pasos que hemos de dar**. O dicho de otra
+manera, la profundidad en capas de la red no depende de la longitud de las
+palabras que queremos predecir. Cuando procesas una palabra como ZARAGOZA (8
+letras), la RNN se «desenrolla» 8 veces, usando una y otra vez la misma
+capa. Cada capa, eso sí, puede especializarse en estructuras complejas que irá
+pasando a la siguiente (igual que hacíamos con los bordes y las esquinas
+antes). Podemos tener una capa que aprenda a reconcer combinaciones de letras
+como CH o LL y otra capa que aprenda a reconocer raíces de palabras o sufijos
+(-ONA, o -ID). Normalmente, con 1, 2 o 3 capas es más que suficiente para
+problemas de texto sencillo. Si pusiéramos 50 capas (una por cada letra), la red
+sería imposible de entrenar por el problema del gradiente que comentamos antes.
 
 Lo que define el tamaño de la palabra a procesar es el **tamaño de la memoria**,
 también llamado *Hidden Size*. Cuanto más compleja sea la estructura que quieres
@@ -174,7 +174,6 @@ De esta forma en cada paso de cada letra la capa hará:
 $$
 \text{Nuevo Hidden} = \tanh(W_{ih} \cdot \text{Letra} + W_{hh} \cdot \text{Hidden Anterior})
 $$
-
 
 
 ```
@@ -253,3 +252,83 @@ for epoch in range(1000):
     if (epoch + 1) % 100 == 0:
         print(f"Epoca {epoch+1}/1000 - Error: {total_loss/len(ciudades):.4f}")
 ```
+
+
+Vamos ahora a probar el modelo. Lo haremos con la función
+`genera_ciudad(letra_inicio)`. Esta función toma la letra de inicio de una
+ciudad y genera la ciudad más probable con esta letra. El problema sigue siendo
+el contexto vacío. La memoria o el *Hidden* en este ejemplo se inicia cada
+vez que lanzamos la función.
+
+
+```
+def generar_ciudad(letra_inicio):
+    modelo.eval()
+    with torch.no_grad():
+        char = letra_inicio
+        nombre = char
+        hidden = modelo.init_hidden()
+
+        for _ in range(15):
+            x = palabra_a_tensor(char)
+            output, hidden = modelo(x[0].unsqueeze(0), hidden)
+            
+            _, top_i = output.topk(1)
+            char = int_to_char[top_i.item()]
+            if char == '.': 
+                break
+            nombre += char
+
+    return nombre
+```
+
+
+Para enriquecer el contexto y mejorar la predicción podríamos tener un vector
+para «Ciudades del Norte» y otro para «Ciudades del Sur». De esta forma, si le
+pasamos el vector «Norte» a la memoria inicial y luego le das la letra «B», la
+red tendrá más predisposición a escribir `BILBAO` que `BARCELONA`. También
+podríamos hacer que continuara una secuencia o *prompt*. Esa secuencia se puede
+interpretar como un prefijo que «calienta» la memoria o el `hidden`.  Esto
+demuestra que el `hidden_size` (las 128 anotaciones anteriormente mencionadas)
+es realmente un resumen del pasado. No importa si ese pasado fue una letra o un
+libro entero; si el resumen es bueno, la red sabe qué decir a continuación. Sin
+embargo, aquí es donde la RNN básica suele fallar. Si le das un prefijo muy
+largo, la influencia de la primera letra en ese hidden se habrá evaporado. Si
+quisiéremos inicializar ese contexto o memoria con algo de información
+adicional, como un prefijo podríamos usar la siguiente función.
+
+
+```
+def completar_ciudad(prefijo):
+    modelo.eval()
+    with torch.no_grad():
+        hidden = modelo.init_hidden()
+        
+        # 1. "Calentamos" la memoria con el prefijo
+        for i in range(len(prefijo) - 1):
+            x = palabra_a_tensor(prefijo[i])
+            _, hidden = modelo(x[0].unsqueeze(0), hidden)
+        
+        # 2. Ahora empezamos a generar desde la ultima letra del prefijo
+        char = prefijo[-1]
+        nombre = prefijo
+        
+        for _ in range(15):
+            x = palabra_a_tensor(char)
+            output, hidden = modelo(x[0].unsqueeze(0), hidden)
+            
+            _, top_i = output.topk(1)
+            char = int_to_char[top_i.item()]
+            
+            if char == '.': 
+                break
+            nombre += char
+            
+    return nombre
+```
+
+
+## El avance de las LSTM
+
+
+
