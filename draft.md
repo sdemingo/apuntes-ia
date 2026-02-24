@@ -327,8 +327,114 @@ def completar_ciudad(prefijo):
     return nombre
 ```
 
+De cualquier manera, si introducimos en nuestro dataset nombres o frases largas
+como «LOS NIÑOS QUE CORREN POR EL PARQUE ESTÁN CANSADOS» o «LA NIÑA QUE CORRE
+POR EL PARQUE ESTÁ CANSADA» veremos que aquí la red tiene que recordar el sujeto
+(«LOS NIÑOS» o «LA NIÑA») a través de una distancia de 20 o 30 caracteres para
+decidir si el final es «CANSADOS» o «CANSADA».  Esto lo podemos forzar usando un
+dataset absurdo pero sature la memoria de la RNN, por ejemplo:
+
+```
+relleno = " - esto es solo texto de relleno para que la red se olvide - "
+dataset_dificil = [
+    f"ROJO{relleno}MANZANA.",
+    f"VERDE{relleno}LECHUGA.",
+    f"AZUL{relleno}OCEANO."
+]
+```
+
+Si usamos ese dataset en lugar de `ciudades` y lanzamos el entrenamiento veremos
+que al final, cuando intentamos predecir los resultados son totalmente
+incorrectos. Por ejemplo, ante la instrucción `print(completar_ciudad("R"))`
+ahora el programa retorna `ROJO - esto es .... olvide - OCEANO`. Debería haber
+acabado con `MANZANA` pero claramente olvidó que el comienzo de la frase era
+`ROJO`. Esto podrá solucionarse usando LSTM.
+
 
 ## El avance de las LSTM
 
+Las *Long Short-Term Memory* o LSTM son un tipo avanzado de red neuronal
+recurrente (RNN) diseñadas para aprender dependencias a largo plazo en datos
+secuenciales, superando el problema del desvanecimiento del gradiente de las RNN
+tradicionales. Utilizan una estructura interna de celdas con puertas (olvido,
+entrada, salida) para controlar el flujo de información, almacenando o
+descartando datos relevantes a lo largo del tiempo. A diferencia de las RNN
+básicas, las LSTM gestionan una memoria a corto y largo plazo mediante estas
+puertas que regulan la información. Estas puertas son:
+
+1. **Puerta de Olvido** (Forget Gate): Mira la letra nueva y decide: «¿Sigo
+necesitando recordar que la palabra empezaba por 'V' o ya puedo borrarlo?».
+
+2. **Puerta de Entrada** (Input Gate): Decide qué información de la letra actual
+   merece la pena guardarse en el «archivador».
+
+3. **Puerta de Salida** (Output Gate): Decide qué parte de toda la memoria
+acumulada vamos a usar para predecir la siguiente letra.
+
+El estado oculto o *Hidden State* de antes también ha cambiado. Ahora está
+compuesto por dos estructuras. Por un lado tenemos $h$ (Hidden State) que es,
+básicamente, la memoria de trabajo (lo que pasó hace un segundo). Por otro lado
+está $C$ o (Cell State) que es la memoria a largo plazo, o el «archivador» que
+no se borra. De ahí que `init_hidden`, en el código inferior, retorne dos
+tensores para cada una de estas estructuras.
+
+```
+class GeneradorCiudadesLSTM(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super(GeneradorCiudadesLSTM, self).__init__()
+        self.hidden_size = hidden_size
+
+        # CAMBIO CLAVE: nn.RNN -> nn.LSTM
+        self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True)
+        
+        self.fc = nn.Linear(hidden_size, output_size)
+    
+    def forward(self, x, hidden):
+        # Ahora 'hidden' es una tupla (h, c)
+        out, (h, c) = self.lstm(x, hidden)
+        
+        out = self.fc(out)
+        return out, (h, c)
+
+    def init_hidden(self):
+        # La LSTM necesita DOS tensores de ceros: uno para h y otro para c
+        return (torch.zeros(1, 1, self.hidden_size),
+                torch.zeros(1, 1, self.hidden_size))
+
+modelo_lstm = GeneradorCiudadesLSTM(n_letras, 128, n_letras)
+```
 
 
+Como se mencionó en la sección anterior, en la RNN básica multiplicábamos el
+error por los pesos una y otra vez hasta que desaparecía. A eso lo llamábamos el
+problema del gradiente desvanesciente. En la LSTM, el *Cell State* (C) es como
+una cinta transportadora. El error puede viajar por esa cinta hacia atrás en el
+tiempo sin ser multiplicado por pesos que lo reduzcan drásticamente.  Es un
+camino libre de obstáculos para el gradiente. Usando PyTorch, el bucle de
+entrenamiento es idéntico al de la RNN, pero notarás algo en los resultados. Por
+ejemplo, si usamos un dataset incluso más «complicado» que el que saturó la RNN
+antes, comprobaremos que el resultado si es el esperado.
+
+```
+relleno = " - esto es solo texto de relleno para que la red se olvide - "
+ciudades = [
+    f"ROJO{relleno}MANZANA.",
+    f"VERDE{relleno}LECHUGA.",
+    f"AZUL{relleno}OCEANO.",
+    f"AMARILLO{relleno}PLATANO.",
+    f"ROSA{relleno}PANTERA.",
+    f"NEGRO{relleno}CARBON."
+]
+```
+
+En este caso hemos aumentado el número de épocas a 5000 ya que las LSTM
+necesitan algo más de «calentamiento» para sus puertas. Con ello, lanzando tras
+el entrenamiento la instrucción `print(completar_ciudad("ROSA"))` ahora
+obtenemos `ROSA - esto ... olvide - PANTERA`. La red ha sido capaz de completar
+la predicción debido a que tiene la *Forget Gate*. Ella verá que el relleno no
+ayuda a predecir la siguiente letra y decidirá no darle importancia, mientras
+mantiene el valor de `ROJO` intacto en el *Cell State*.
+
+
+
+## Aprendiendo conceptos (*Embeddings*)
