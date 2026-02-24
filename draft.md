@@ -32,28 +32,26 @@ siguiente. Esto permite a las RNNs capturar dependencias temporales y patrones
 secuenciales.  A diferencia de las redes feed-forward tradicionales, donde las
 operaciones se reducen principalmente a multiplicaciones de matrices y
 transformaciones mediante funciones de activación, las RNN procesan datos
-secuenciales manteniendo una memoria oculta (hidden state) que se actualiza en
+secuenciales manteniendo una memoria oculta o *Hidden state* que se actualiza en
 cada paso temporal. Vamos a comenzar a desarrollar el concepto con un problema
 clásico: la predicción de caracteres. Imagina que le enseñamos a la red la
 palabra «HOLA». Si le damos la H, debe predecir la O y si le damos la O, debe
 predecir la L y así sucesivamente. Pero para predecir la A, la red tiene que
 «recordar» que antes vinieron la H, la O y la L. Si solo viera la L, no sabría
-si la palabra es «HOLA», «PELO» o «ALTO».
+si la palabra es «HOLA», «PELO» o «ALTO». En una CNN, los datos fluyen de
+entrada a salida y desaparecen. En una RNN, la red tiene un bucle interno. Cada
+vez que la red procesa una letra, genera dos cosas:
 
-En una CNN, los datos fluyen de entrada a salida y desaparecen. En una RNN, la
-red tiene un bucle interno. Cada vez que la red procesa una letra, genera dos
-cosas:
+* **Una salida** o predicción de la siguiente letra.
 
-* Una salida: (La predicción de la siguiente letra).
-
-* Un estado oculto ($h_t$): Una especie de memoria a corto plazo que se vuelve
-  a meter en la red junto con la siguiente letra.
+* **Un estado oculto** que es una especie de memoria a corto plazo que se vuelve a
+  meter en la red junto con la siguiente letra.
   
 Las RNN básicas tienen un defecto de diseño: son muy buenas recordando lo que
 pasó hace un segundo, pero pésimas recordando lo que pasó hace diez. Es el
 problema del desvanecimiento del Gradiente o *vanishing gradient* del que ya
 hemos hablado anteriormente en la sección \ref{desvanecimiento} pero llevado al
-extremo. En una CNN o una red multicapa, tienes, por ejemplo, 5 o 10 capas
+extremo. En una CNN o una red multicapa tienes, por ejemplo, 5 o 10 capas
 físicas. Pero en una RNN, si estás procesando una frase de 50 palabras, es como
 si tuvieras una red de 50 capas de profundidad y además hay que tener en cuenta
 un agravante: la matriz de pesos es la misma en cada paso. En una red normal,
@@ -92,13 +90,11 @@ print(f"Vocabulario: {alfabeto}")
 
 Creamos la variable `alfabeto` con todas las letras involucradas en las palabras
 que queremos predecir (además del punto) y, a partir de ellos, creamos los
-diccionarios `char_to_int` y `int_to_char`.
-
-Para entrenar la red, necesitamos pares de Entrada (X) y Objetivo (Y). Si la
-palabra es MADRID.: Cuando ve M, el objetivo es A. Cuando ve A, el objetivo es
-D. Y así seguiremos sucesivamente hasta que vea D, el objetivo es . (fin). Ahora
-necesitamos convertir cada palabra a un tensor. Para ello usaremos la siguientes
-funciones:
+diccionarios `char_to_int` y `int_to_char`. Para entrenar la red, necesitamos
+pares de Entrada (X) y Objetivo (Y). Si la palabra es MADRID.: Cuando ve M, el
+objetivo es A. Cuando ve A, el objetivo es D. Y así seguiremos sucesivamente
+hasta que vea D, el objetivo es . (fin). Ahora necesitamos convertir cada
+palabra a un tensor. Para ello usaremos la siguientes funciones:
 
 ```
 def palabra_a_tensor(palabra):
@@ -116,11 +112,11 @@ def palabra_a_objetivo(palabra):
 
 El tensor resultante será algo parecido al mostrado en la figura pero
 almacenando los índices de cada letra en lugar de la propia letra en si
-mima. Hay otros cambios, además de la modelización de los datos de entrada, con
+misma. Hay otros cambios, además de la modelización de los datos de entrada, con
 respecto a las CNN anteriores. Por ejemplo, antes en las CNN el error se
 calculaba al final de la imagen. Ahora calcularemos el error en cada letra. Si
-la red predice E en lugar de A en M-A-D-R-I-D, ya tenemos un error que propagar
-hacia atrás (Backpropagation Through Time).
+la red predice E en lugar de A en M-**A**-D-R-I-D, ya tenemos un error que propagar
+hacia atrás.
 
 
 ![Visualización del tensor de la palabra «HOLA»](./img/tensor-palabras.png){width=5cm}
@@ -143,10 +139,10 @@ como CH o LL y otra capa que aprenda a reconocer raíces de palabras o sufijos
 problemas de texto sencillo. Si pusiéramos 50 capas (una por cada letra), la red
 sería imposible de entrenar por el problema del gradiente que comentamos antes.
 
-Lo que define el tamaño de la palabra a procesar es el **tamaño de la memoria**,
-también llamado *Hidden Size*. Cuanto más compleja sea la estructura que quieres
-aprender (no más larga, sino más compleja), más grande debe ser ese *Hidden
-Size*.
+Lo que define el tamaño de la palabra a procesar es el **tamaño de la memoria**
+o lo que es lo mismo, el ancho del *Hidden State*. Cuanto más compleja sea la
+estructura que quieres aprender (no más larga, sino más compleja), más ancha
+debe ser esa capa.
 
 
 ## Programando una RNN
@@ -156,7 +152,7 @@ de memoria (ancho de nuestra red). Son estas neuronas las que guardan el
 recuerdo de lo leído. En nuestro caso, cuando la red lee la letra «M», escribe
 algo en esas 128 libretas. Cuando pasa a la siguiente letra («A»), lee lo que
 había en las 128 libretas y escribe encima la nueva información. Si usáramos un
-*Hidden Size* de 2, la red solo tendría dos anotaciones para recordar qué ciudad
+*Hidden State* de 2, la red solo tendría dos anotaciones para recordar qué ciudad
 está escribiendo y, por tanto, es casi seguro que se olvidara de si empezó por
 «M» o por «B» a la tercera letra. Si usáramos 1024, tendrá una memoria épica,
 pero tardará mucho más en entrenar. En PyTorch, la capa `nn.RNN` devuelve dos
@@ -174,6 +170,30 @@ De esta forma en cada paso de cada letra la capa hará:
 $$
 \text{Nuevo Hidden} = \tanh(W_{ih} \cdot \text{Letra} + W_{hh} \cdot \text{Hidden Anterior})
 $$
+
+
+Para entenderlo, piensa en la palabra "HOLA" y sitúate en el momento en que la red está procesando la letra "L".
+
+1. $W_{ih}$ (El presente): se analiza la Letra que está entrando, la `L` y se multiplica el vector de la `L` por sus pesos para extraer sus características. 
+
+2. $W_{hh}$ (El pasado): Se rescata la información útil que viene de la memoria anterior (el llamado `hidden` en el código) que trae la información de `H` y de `O`. Por tanto se multiplica la memoria anterior por sus propios pesos.
+
+3. $tanh$ Se suman ambos productos y se pasa a la función de activación, llamada Tangente Hiperbólica, similar a la sigmoide y que mantiene los resultados entre -1 y 1.
+
+De esta suma y activación salen dos líneas: Una de ellas va hacía la capa
+`Linear` y hacia la salida para intentar adivinar que la siguiente letra es
+`A`. La otra se guarda para el siguiente paso como un nuevo recuerdo. Ahora este
+nuevo recuerdo contendrá `HOL` y cuando entre la siguiente letra este será
+`hidden` use use $W_{hh}$.  Decimos que estos pesos son compartidos porque son
+los mismos para todas las letras. Cuando procesas la `H` o la `O` usas
+exactamente el mismo $W_{ih}$. Estos pesos no se reajustan hasta finalizar el
+procesamiento completo de la entrada. Es al final de esta, cuando se calcula el error total y realizamos la propagación.
+
+>Una buena analogía para entender esto sería pensar en una palabra como en una tanda de lanzamiento de dardos. Para MADRID lanzas 6 dardos, donde W es la técnica de lanzamiento que usas para los 6 (posición del brazo, fuerza, etc.) Durante todos los lanzamientos mantienes la técnica y al finalizar revisas donde han caído los 6 y tomas decisiones acerca de como modificar tu técnica.
+
+
+
+![Diagrama de funcionamiento de la capa oculta](./img/rnn.png){width=10cm}
 
 
 ```
@@ -438,3 +458,4 @@ mantiene el valor de `ROJO` intacto en el *Cell State*.
 
 
 ## Aprendiendo conceptos (*Embeddings*)
+
