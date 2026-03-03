@@ -459,3 +459,126 @@ mantiene el valor de `ROJO` intacto en el *Cell State*.
 
 ## Aprendiendo conceptos (*Embeddings*)
 
+
+Hasta ahora, tratábamos a las palabras o letras como islas desiertas. Para la
+red, la letra «A» (0) y la «B» (1) estaban tan cerca como la «A» (0) y la «Z»
+(25). No había significado. Un Embedding es una técnica que convierte cada
+palabra (o letra) en un vector de números reales (por ejemplo, un vector de
+tamaño 3, 50 o 300). Números no elegidos al azar sino estudiados y
+calculados. La red aprende a colocar palabras con significados similares en
+puntos cercanos de un espacio geométrico. Es como si la red creara un mapa
+mental donde «Madrid» y «Barcelona» están en la misma «provincia», pero
+«Manzana» está en otro continente. Vamos a imaginar un espacio de solo 2
+dimensiones o un plano cartesiano. En este espacio podríamos definir las
+palabras así:
+
+```
+Palabra	      Dim. 1 (Es Ciudad?)	    Dim. 2 (Es Comida?)
+
+Madrid	         0.95	                      0.01
+Valencia   	     0.92	                      0.15
+Manzana	         0.02	                      0.98
+```
+
+![](./img/conceptos.png){width=10cm}
+
+Lo increíble de los Embeddings es que permiten hacer aritmética con conceptos. Un ejemplo muy famoso es:
+
+
+$$ \text{vec}(\text{Rey}) - \text{vec}(\text{Hombre}) + \text{vec}(\text{Mujer}) \approx \text{vec}(\text{Reina}) $$
+
+
+La red entiende la "distancia" que hay entre géneros y la aplica a otros
+conceptos. ¿Cómo ajustamos los valores de ese vector por cada palabra? En
+principio, los valores del vector de cada palabra se comportan exactamente como
+pesos. Al principio, la red crea una tabla de búsqueda con números
+aleatorios. Para la red, "Madrid" y "Manzana" empiezan siendo vectores al azar
+que no se parecen en nada y durante el entrenamiento, esos números se van
+refinando mediante el mismo proceso de siempre, el *Backpropagation*. La gran
+diferencia es que ahora para calcular ese error, la red no tiene un vector de
+referencia por palabra como ocurría antes con los resultados esperados. Ahora la
+red intenta resolver una tarea. Imagina que la tarea es: "Adivina la palabra que falta".
+
+```
+    Frase 1: "El [___] vuela por el cielo." (Respuesta: Pajaro)
+
+    Frase 2: "El [___] vuela muy alto." (Respuesta: Avion)
+```
+
+Para que la red acierte ambas frases usando los mismos pesos internos, se dará
+cuenta de que los vectores de «Pájaro» y «Avión» deben ser parecidos, porque
+ambos «encajan» en el mismo contexto de «vuela» y «cielo». Por lo tanto, la
+referencia no es un vector, es el contexto. **Las palabras que aparecen en
+contextos similares terminan teniendo vectores similares**, esa es justo la
+clave.
+
+Imagina que tenemos un vector de solo 2 dimensiones para cada palabra. La red se
+equivoca al predecir y el error «empuja» los vectores. Entiendo ahora cercanía
+como una métrica de distancia en la frase textual. Si «Madrid» aparece mucho
+cerca de «España», el error obligará a que esos dos vectores se acerquen para
+que la red deje de fallar. Si «Madrid» nunca aparece cerca de «Sandía», no hay
+ninguna fuerza que los acerque, y acabarán en puntas opuestas del mapa.  A este
+concepto de cercanía se le denomina **Hipótesis Distribucional**. En lingüística
+computacional hay una frase famosa que dice «Conocerás a una palabra por la
+compañía que mantiene». Esa cercanía es la concurrencia del concepto dentro de
+una ventana de texto. El tamaño de esta ventana será también un factor de diseño
+clave a la hora de tener una buena red. Otro parámetro importante que deberemos
+de fijar será el tamaño del vector (ej: 128 o 300) aunque será la red quien
+decida el contenido. Si el vector es muy pequeño (ej: tamaño 2), la red estará
+muy «apretada» y solo podrá aprender distinciones básicas (como «comida» vs
+«ciudad»). Pero si el vector es grande (ej: 300), la red puede dedicar una
+dimensión a la «felicidad», otra al «género», otra a si es un «verbo» o un
+«sustantivo», etc.
+
+En resumen, hasta ahora, con nuestra RNN de ciudades, la red solo sabía que
+M-A-D-R-I-D era una secuencia de símbolos. Con letras, la red sufre para
+entender que «Madrid» y «Vigo» son el mismo tipo de objeto (ciudades). Sin
+embargo, con el uso de *Embeddings*, la red recibe un vector que ya le dice:
+«Eh, este objeto tiene la etiqueta de 'Ciudad' y 'España' grabada en sus
+coordenadas».
+
+Vamos ahora con la implementación. El principal cambio es es que ahora la red no
+recibirá un chorro de letras, sino vectores densos que representan
+palabras. Estas palabras salen de un proceso previo de análisis de textos
+llamado tokenización. Partimos de un *corpus* de frases que limpiaremos y de
+donde extraeremos las palabras del vocabulario. Añadimos los tokens `<PAD>` para
+que todas las frases ocupen lo mismo y poder meter así meterlas todas en un
+mismo lote o *batch* y `<UNK>` para palabras que pueden aparecer en el futuro y
+no conozcamos previamente.
+
+```
+corpus = [
+    "Madrid es la capital de España",
+    "Valencia es una ciudad con playa",
+    "Barcelona tiene mar y monumentos",
+    "Vigo es una ciudad del norte de España",
+    "Sevilla tiene un color especial"
+]
+
+
+palabras_sueltas = " ".join(corpus).lower().split()
+vocabulario = sorted(list(set(palabras_sueltas)))
+
+tokens_especiales = ["<PAD>", "<UNK>"]
+vocab_final = tokens_especiales + vocabulario
+```
+
+Ahora que tenemos el mapa, necesitamos convertir una frase real en algo que la
+capa *Embedding* pueda digerir. Para ello usaremos la función `frase_a_tensor`
+en la que convertimos la frase en una lista de índices. Si la palabra no está en
+nuestro diccionario usaremos `<UNK>`.
+
+```
+def frase_a_tensor(frase, word_map):
+    indices = [word_map.get(w.lower(), 1) for w in frase.split()]
+    return torch.LongTensor(indices)
+```
+
+Por ejemplo, usando esta función con la frase `Madrid tiene playa` obtenemos un
+tensor con los índices de las palabras «Madrid», «tiene» y «playa»:
+
+```
+Frase: Madrid tiene playa
+Tensor resultante: tensor([13, 19, 17])
+``` 
+
